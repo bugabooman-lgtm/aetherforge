@@ -130,6 +130,25 @@ input.f,select.f{width:100%;box-sizing:border-box;background:#170f09;border:1.5p
 .log .d{color:var(--fg-3);font-size:13px;margin-right:6px}
 
 /* Battle */
+#dhud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#dhud>*{pointer-events:auto}
+#dTop{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:12px;right:12px;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;padding:8px 12px}
+#dTop .nm{font:16px var(--display,inherit);color:var(--brass-hi)}
+#dTop .r{text-align:right}
+#dTop .sub{font-size:13px;color:var(--fg-2)}
+#dAdv{grid-column:1/3;height:8px;background:#7a2a22;border:1px solid var(--brass-lo);border-radius:4px;overflow:hidden}
+#dAdvBar{height:100%;width:50%;background:#8fbf6a;transition:width .4s}
+#dCtl{position:absolute;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;pointer-events:none}
+#dCtl>div{display:grid;gap:6px;pointer-events:auto}
+#dDef{grid-template-columns:repeat(3,auto)}
+#dAtk{grid-template-columns:repeat(3,auto)}
+#dAtk .wide{grid-column:span 1}
+#dCtl .b{min-width:56px;min-height:48px;touch-action:none}
+@media (max-width:640px){
+  #dCtl{flex-direction:column;align-items:stretch}
+  #dCtl>div{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #dCtl .b{min-width:0;padding:6px 4px;font-size:13px;white-space:nowrap}
+}
 #bhud{position:fixed;inset:0;pointer-events:none;z-index:10}
 #bhud>*{pointer-events:auto}
 .shipcard{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));width:190px;padding:10px 12px}
@@ -242,6 +261,28 @@ input.f,select.f{width:100%;box-sizing:border-box;background:#170f09;border:1.5p
         <button class="b shot" data-shot="chain"><span class="key">X</span>Chain</button>
         <button class="b shot" data-shot="canister"><span class="key">C</span>Canister</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="dhud" hidden>
+  <div id="dTop" class="plate">
+    <div><div class="nm" id="dMeName"></div><div class="sub num" id="dMeCrew"></div></div>
+    <div class="r"><div class="nm" id="dFoeName"></div><div class="sub num" id="dFoeCrew"></div></div>
+    <div id="dAdv" aria-label="How the crews' fight is going"><div id="dAdvBar"></div></div>
+  </div>
+  <div id="dCtl">
+    <div id="dDef">
+      <button class="b" data-act="duck"><span class="key">↓</span>Duck</button>
+      <button class="b" data-act="parry"><span class="key">←</span>Parry</button>
+      <button class="b" data-act="jump"><span class="key">↑</span>Jump</button>
+      <button class="b" id="dPause"><span class="key">P</span>Pause</button>
+      <button class="b" data-act="taunt"><span class="key">T</span>Taunt</button>
+    </div>
+    <div id="dAtk">
+      <button class="b" data-act="chop"><span class="key">Z</span>Chop</button>
+      <button class="b" data-act="thrust"><span class="key">X</span>Thrust</button>
+      <button class="b" data-act="slash"><span class="key">C</span>Slash</button>
     </div>
   </div>
 </div>
@@ -882,7 +923,7 @@ function drawPortrait(cv,b,frame){
 }
 
 // ===================== AETHERFORGE DATA =====================
-const VERSION = "0.30";
+const VERSION = "0.31";
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -1805,7 +1846,7 @@ function netMyPresence() {
   const s = G.ship; let a = "sun", ax = 0, ay = 0, bd = 150 * WORLD;
   for (const id of NET_BODIES()) { const b = bodyPos(id, G.day), d = Math.hypot(s.x - b.x, s.y - b.y); if (d < bd) { bd = d; a = id; ax = s.x - b.x; ay = s.y - b.y; } }
   if (a === "sun") { ax = Math.hypot(s.x, s.y); ay = Math.atan2(s.y, s.x); }
-  const st = mode === "title" ? "away" : mode === "battle" || mode === "dive" ? "battle" : G.docked ? "port:" + G.docked : "sea";
+  const st = mode === "title" ? "away" : mode === "battle" || mode === "dive" || mode === "duel" ? "battle" : G.docked ? "port:" + G.docked : "sea";
   return { cap: G.captain, rank: rankOf(), ship: G.shipName, type: s.type, nat: G.nation, fame: Math.floor(G.fame), fleet: fleetSize(), up: s.up,
     a, ax: Math.round(ax * 10) / 10, ay: a === "sun" ? Math.round(ay * 1000) / 1000 : Math.round(ay * 10) / 10, h: Math.round(s.h * 100) / 100, st, v: VERSION };
 }
@@ -1962,6 +2003,276 @@ function netCaptainScreen(id, back) {
       <p class="note">Trading, sailing together and duels between captains come in later versions.</p>
     </div><footer><button class="b main" id="ncBack">Back</button></footer>`, e => { if (e.key === "Escape") close(); });
   paintPortraits(panel); $("ncBack").onclick = close; netWireSignal(id); netRefresh(true); $("netMsg").focus();
+}
+
+// ===================== BOARDING DUELS (0.31) =====================
+// When hulls touch, the captains cross swords while their crews brawl behind them, as in Pirates!.
+// Three attacks, each answered by one defence: chop <-> duck, thrust <-> parry, slash <-> jump.
+// A hit drives the loser back along the deck; reach the end of it and the fight is over.
+let D = null;
+const DUEL_LEN = 9; // steps from the middle of the deck to either end
+const ATK = {
+  chop:   { n: "Chop",   wind: 0.62, rec: 0.55, push: 3, answer: "duck",  cue: "Duck!" },
+  thrust: { n: "Thrust", wind: 0.36, rec: 0.32, push: 1, answer: "parry", cue: "Parry!" },
+  slash:  { n: "Slash",  wind: 0.48, rec: 0.42, push: 2, answer: "jump",  cue: "Jump!" }
+};
+const SWORDS = {
+  sabre:   { n: "Cavalry sabre", d: "Balanced in attack and defence", spd: 1,    push: 0, guard: 0.45 },
+  rapier:  { n: "Rapier",        d: "Faster attacks, but a shorter guard", spd: 1.18, push: 0, guard: 0.36 },
+  cutlass: { n: "Naval cutlass", d: "Slower, but drives the enemy further back", spd: 0.88, push: 1, guard: 0.5 }
+};
+const DEF_WORD = { duck: "Ducked!", parry: "Parried!", jump: "Jumped clear!" };
+
+// ---------- when hulls touch ----------
+function boardingPanel() {
+  const a = B.a; B.hold = true; B.me.v = 0; B.foe.v = 0;
+  for (const k in keys) keys[k] = false; for (const k in hold) hold[k] = false;
+  const cap = duelFoeName(a), lastSw = G.sword || "sabre";
+  showPanel(`<header><div><h2 id="pTitle">Boarders away!</h2><div class="tag">The ${esc(a.name)}, ${esc(aiLabel(a))}</div></div></header>
+    <div class="body"><div class="prose"><p>The hulls grind together and grappling hooks fly. Across the rail, ${esc(cap)} draws a blade and waits for you.</p>
+      <p class="note">Lead the boarders yourself and the fight is yours to win or lose. Choose your sword.</p></div>
+      <div class="choices">${Object.entries(SWORDS).map(([k, s], i) => `<button class="choice" data-sword="${k}" aria-pressed="${k === lastSw}"><b><span class="key">${"ZXC"[i]}</span>${s.n}</b><span>${s.d}</span></button>`).join("")}</div>
+    </div>
+    <footer><button class="b" id="bdAuto">Let the crew settle it</button><button class="b main" id="bdGo" autofocus><span class="key">↵</span>Lead the boarders</button></footer>`,
+    e => { const k = e.key.toLowerCase(), i = "zxc".indexOf(k); if (i >= 0) go(Object.keys(SWORDS)[i]); else if (k === "enter") go(pick); });
+  let pick = lastSw;
+  const go = sw => { G.sword = sw; closePanel(); B.hold = false; startDuel(sw, cap); };
+  panel.querySelectorAll("[data-sword]").forEach(b => b.onclick = () => go(b.dataset.sword));
+  $("bdGo").onclick = () => go(pick);
+  $("bdAuto").onclick = () => { closePanel(); B.hold = false; board(); };
+}
+function duelFoeName(a) {
+  if (a.capName) return a.capName;
+  const sp = a.corsair ? "Skarr" : a.nat === "mars" ? "Ossari" : "Human";
+  a.capSp = sp; a.capName = (sp === "Human" ? "Captain " : "") + speciesName(sp);
+  return a.capName;
+}
+function startDuel(sword, cap) {
+  const a = B.a, m = B.me, f = B.foe;
+  const skill = clamp((a.corsair ? 0.6 : a.role === "navy" ? 0.55 : a.role === "pirate" ? 0.45 : 0.25) + 0.08 * (SHIPS[a.type].size - 1) + 0.02 * G.rank, 0.15, 0.85);
+  D = { a, sword: SWORDS[sword], skill, cap, p: 0, cam: 0, t: 0, over: null, overT: 0, crewMe: m.crew, crewFoe: f.crew, crewMe0: m.crew, crewFoe0: f.crew, crewT: 0, adv: 0,
+    me: newFighter(), foe: newFighter(), think: 1.1, plan: null, queue: null, msg: "On guard!", msgT: 1.4, shake: 0, sparks: [],
+    lookMe: duelLook("player"), lookFoe: duelLook(a), brawl: Array.from({ length: 22 }, (_, i) => ({ side: i % 2, x: rnd(0.08, 0.92), ph: rnd(0, 6), sp: rnd(2.5, 4.5) })) };
+  B.boarded = true; mode = "duel"; $("bhud").hidden = true; $("dhud").hidden = false;
+  $("dMeName").textContent = `${rankOf()} ${G.captain}`; $("dFoeName").textContent = cap;
+  duelHud();
+}
+const newFighter = () => ({ st: "idle", t: 0, dur: 0, kind: null, rip: 0, off: false });
+function duelLook(a) {
+  if (a === "player") { const coat = { gb: "#a8322a", de: "#3c4a5c", fr: "#2f4f8f", ru: "#2f6b4a" }[G.nation] || "#a8322a"; return { coat, trim: "#e8c873", skin: "#e2b48c", pants: "#efe2c4", hat: "cap", hatCol: "#1d1a17" }; }
+  if (a.corsair) return { coat: "#3a2420", trim: "#c9a14a", skin: "#7a2a22", pants: "#2a1d12", hat: "crest", hatCol: "#1a120b" };
+  if (a.nat === "mars") return { coat: "#6a4a8a", trim: "#e0b45a", skin: "#c9a06c", pants: "#d9a85a", hat: "tall", hatCol: "#e0b45a" };
+  if (a.role === "pirate") return { coat: "#26221f", trim: "#7a2a22", skin: "#d9a57c", pants: "#5a4a3a", hat: "tricorn", hatCol: "#151210" };
+  if (a.role === "navy") return { coat: "#1f2c44", trim: NATIONS[a.nat].col, skin: "#e2b48c", pants: "#e3e3df", hat: "cap", hatCol: "#101827" };
+  return { coat: "#6b4a2b", trim: "#c9c3b4", skin: "#e2b48c", pants: "#3b3f44", hat: "bowler", hatCol: "#2a2a2a" };
+}
+
+// ---------- rules ----------
+function duelAdv() {
+  const pm = D.crewMe * (0.75 + G.ship.morale / 200) * (1 + 0.35 * eff("marine")), pf = D.crewFoe * 0.95;
+  return pm + pf <= 0 ? 0 : clamp((pm - pf) / (pm + pf) * 1.6, -1, 1);
+}
+const duelSpeed = who => who === D.me ? (1 + 0.18 * D.adv) * (G.skill === "fence" ? 1.12 : 1) : (1 - 0.18 * D.adv) * (0.82 + 0.4 * D.skill);
+function duelAct(who, act) {
+  const F = who, mine = who === D.me;
+  if (F.st !== "idle") { if (mine) D.queue = { act, at: D.t }; return false; }
+  if (ATK[act]) {
+    const sw = mine ? D.sword.spd : 1, rip = F.rip > 0 ? 0.6 : 1;
+    F.st = "wind"; F.kind = act; F.t = 0; F.dur = ATK[act].wind * rip / (duelSpeed(F) * sw); F.rip = 0;
+    if (mine) duelFoeReacts(act, F.dur);
+  } else if (act === "taunt") { F.st = "taunt"; F.t = 0; F.dur = 0.8; }
+  else { F.st = "def"; F.kind = act; F.t = 0; F.dur = (mine ? D.sword.guard : 0.45); }
+  return true;
+}
+// The enemy captain sees your wind-up and may answer it, depending on skill and how slow the blow is.
+function duelFoeReacts(kind, dur) {
+  const chance = clamp(D.skill + (kind === "chop" ? 0.18 : kind === "thrust" ? -0.15 : 0) - 0.1 * D.adv, 0.05, 0.92);
+  const delay = rnd(0.12, 0.3) / (0.82 + 0.4 * D.skill);
+  if (Math.random() < chance && delay < dur - 0.04) D.plan = { at: D.t + Math.max(delay, dur - 0.4), act: ATK[kind].answer };
+  else if (Math.random() < 0.3) D.plan = { at: D.t + delay, act: pickOne(["duck", "parry", "jump"].filter(x => x !== ATK[kind].answer)) };
+  else D.plan = null;
+}
+function duelStrike(att, def) {
+  const A = ATK[att.kind], mine = att === D.me, dir = mine ? 1 : -1;
+  att.st = "strike"; att.t = 0; att.dur = 0.14;
+  if (def.st === "def" && def.kind === A.answer) {
+    att.off = true; att.next = A.rec * 1.35; def.rip = 0.9; duelSay(mine ? `${D.cap.split(" ").slice(-1)[0]} ${DEF_WORD[A.answer].toLowerCase()}` : DEF_WORD[A.answer], 0.9);
+    D.sparks.push({ x: 0, t: 0.25, kind: A.answer }); return;
+  }
+  let push = A.push + (mine ? D.sword.push : 0) + (def.st === "taunt" ? 1 : 0);
+  D.p = clamp(D.p + dir * push, -DUEL_LEN, DUEL_LEN); att.off = false; att.next = 0.24;
+  def.st = "stun"; def.t = 0; def.dur = 0.4 + 0.08 * push; def.kind = null; D.plan = mine ? null : D.plan; if (!mine) D.queue = null;
+  D.shake = 0.18; D.sparks.push({ x: dir, t: 0.3, kind: "hit" });
+  if (mine) { D.crewFoe = Math.max(0, D.crewFoe - D.crewFoe0 * 0.05); duelSay(["A hit!", "Well struck!", "The enemy reels!"][ri(0, 2)], 0.8); }
+  else { D.crewMe = Math.max(0, D.crewMe - D.crewMe0 * 0.05); duelSay(["You're hit!", "Driven back!", "A touch!"][ri(0, 2)], 0.8); }
+}
+function duelSay(t, sec) { D.msg = t; D.msgT = sec; }
+function stepFighter(F, other, dt) {
+  F.t += dt; if (F.rip > 0) F.rip -= dt;
+  if (F.st === "wind" && F.t >= F.dur) duelStrike(F, other);
+  else if (F.st === "strike" && F.t >= F.dur) { F.st = "rec"; F.t = 0; F.dur = F.next / duelSpeed(F); }
+  else if (F.st === "def" && F.t >= F.dur) { F.st = "rec"; F.t = 0; F.dur = 0.14; F.off = false; }
+  else if (F.st === "taunt" && F.t >= F.dur) { const mine = F === D.me; if (mine) { D.crewFoe = Math.max(0, D.crewFoe - D.crewFoe0 * 0.06); duelSay("Your crew roar and press forward!", 1); } else { D.crewMe = Math.max(0, D.crewMe - D.crewMe0 * 0.06); duelSay("Their crew take heart!", 1); } F.st = "rec"; F.t = 0; F.dur = 0.15; F.off = false; }
+  else if ((F.st === "rec" || F.st === "stun") && F.t >= F.dur) { F.st = "idle"; F.t = 0; F.off = false; F.kind = null; }
+}
+function stepDuel(dt) {
+  if (!D) return; D.t += dt;
+  D.cam += (D.p - D.cam) * Math.min(1, dt * 6); if (D.shake > 0) D.shake -= dt; if (D.msgT > 0) D.msgT -= dt;
+  for (const s of D.sparks) s.t -= dt; D.sparks = D.sparks.filter(s => s.t > 0);
+  if (D.over) { D.overT -= dt; if (D.overT <= 0) finishDuel(); return; }
+  stepFighter(D.me, D.foe, dt); stepFighter(D.foe, D.me, dt);
+  // your buffered order
+  if (D.queue && D.me.st === "idle") { const q = D.queue; D.queue = null; if (D.t - q.at < 0.3) duelAct(D.me, q.act); }
+  // the enemy captain
+  const f = D.foe;
+  if (D.plan && D.t >= D.plan.at) { const pl = D.plan; D.plan = null; if (f.st === "idle" && D.me.st === "wind") duelAct(f, pl.act); }
+  if (f.st === "idle") { D.think -= dt * (f.rip > 0 ? 3 : 1);
+    if (D.think <= 0 && D.me.st !== "wind") { D.think = rnd(0.45, 1.5) / (0.6 + D.skill);
+      if (D.adv > 0.25 && Math.random() < 0.1) duelAct(f, "taunt"); else duelAct(f, pickOne(["chop", "thrust", "thrust", "slash", "slash"])); } }
+  // the crews
+  D.crewT += dt;
+  if (D.crewT > 0.6) { D.crewT = 0; const pm = D.crewMe * (0.75 + G.ship.morale / 200) * (1 + 0.35 * eff("marine")), pf = D.crewFoe * 0.95;
+    D.crewMe = Math.max(0, D.crewMe - pf * 0.006 * rnd(0.4, 1.6)); D.crewFoe = Math.max(0, D.crewFoe - pm * 0.006 * rnd(0.4, 1.6)); D.adv = duelAdv(); duelHud(); }
+  // endings
+  if (D.p >= DUEL_LEN) duelEnd("win", `${D.cap} is driven to the taffrail and throws down the blade. The ship is yours!`);
+  else if (D.p <= -DUEL_LEN) duelEnd("lose", `${D.cap} beats down your guard and drives you to the rail. You yield.`);
+  else if (D.crewMe < 1 && D.p < 0) duelEnd("lose", `Your last boarders are beaten down around you. ${D.cap} takes your sword.`);
+  else if (D.crewFoe < 1 && D.p > 0) duelEnd("win", `With the last of the crew beaten, ${D.cap} lowers the blade and surrenders the ship.`);
+}
+function duelEnd(result, line) { D.over = result; D.line = line; D.overT = 1.5; duelSay(result === "win" ? "Victory!" : "Beaten!", 2); (result === "win" ? D.foe : D.me).st = "fall"; (result === "win" ? D.foe : D.me).t = 0; duelHud(); }
+function finishDuel() {
+  const d = D; D = null; $("dhud").hidden = true; mode = "battle";
+  B.me.crew = Math.max(1, Math.round(d.crewMe)); B.foe.crew = Math.max(1, Math.round(d.crewFoe * (d.over === "win" ? 0.7 : 1)));
+  if (d.over === "win") endBattle("boarded", d.line); else { B.me.crew = Math.max(1, Math.round(B.me.crew * 0.5)); endBattle("lost", d.line); }
+}
+function duelHud() {
+  $("dMeCrew").textContent = `${Math.round(D.crewMe)} boarders`; $("dFoeCrew").textContent = `${Math.round(D.crewFoe)} defenders`;
+  const tot = D.crewMe + D.crewFoe; $("dAdvBar").style.width = (tot > 0 ? D.crewMe / tot * 100 : 50) + "%";
+}
+function duelKey(e) {
+  if (!D || D.over) return; const k = e.key.toLowerCase();
+  const act = k === "z" || k === "," ? "chop" : k === "x" || k === "." ? "thrust" : k === "c" || k === "/" ? "slash" :
+    k === "arrowup" || k === "w" ? "jump" : k === "arrowdown" || k === "s" ? "duck" : k === "arrowleft" || k === "a" || k === "arrowright" || k === "d" ? "parry" : k === "t" ? "taunt" : null;
+  if (act) { e.preventDefault(); duelAct(D.me, act); }
+}
+
+// ---------- drawing ----------
+const ease = k => k * k * (3 - 2 * k), mix = (a, b, k) => a + (b - a) * k;
+// Pose: arm and sword angles are measured from "pointing at the enemy" (0), positive upward.
+function duelPose(F, t) {
+  const P = { lean: 0, crouch: 0, lift: 0, arm: 0.25, reach: 1, sword: 0.8, lunge: 0, tuck: 0, fall: 0, hip: 0 };
+  const k = F.dur ? clamp(F.t / F.dur, 0, 1) : 0, bob = Math.sin(t / 260) * 0.03;
+  P.arm += bob;
+  if (F.st === "wind") { const e = ease(k);
+    if (F.kind === "chop") { P.arm = mix(0.25, 2.25, e); P.sword = mix(0.8, 2.5, e); P.lean = -0.25 * e; }
+    else if (F.kind === "thrust") { P.arm = mix(0.25, 0.05, e); P.reach = mix(1, 0.4, e); P.sword = mix(0.8, 0.05, e); P.lean = -0.2 * e; }
+    else { P.arm = mix(0.25, -1.9, e); P.sword = mix(0.8, -2.5, e); P.crouch = 0.25 * e; } }
+  else if (F.st === "strike") { const e = ease(k);
+    if (F.kind === "chop") { P.arm = mix(2.25, -0.35, e); P.sword = mix(2.5, -0.3, e); P.lean = 0.4 * e; P.lunge = 0.5 * e; }
+    else if (F.kind === "thrust") { P.arm = 0.05; P.reach = mix(0.4, 1.2, e); P.sword = 0.02; P.lean = 0.5 * e; P.lunge = e; }
+    else { P.arm = mix(-1.9, -0.5, e); P.sword = mix(-2.5, -0.35, e); P.crouch = 0.3; P.lean = 0.35 * e; P.lunge = 0.6 * e; } }
+  else if (F.st === "rec") { const e = 1 - ease(k), kd = F.kind;
+    if (kd === "chop") { P.arm = mix(0.25, -0.35, e); P.sword = mix(0.8, -0.3, e); } else if (kd === "thrust") { P.arm = 0.05 + 0.2 * (1 - e); P.reach = mix(1, 1.2, e); P.sword = mix(0.8, 0.02, e); } else if (kd === "slash") { P.arm = mix(0.25, -0.5, e); P.sword = mix(0.8, -0.35, e); P.crouch = 0.3 * e; }
+    P.lean = (F.off ? 0.55 : 0.3) * e; P.lunge = (ATK[kd] ? 0.6 : 0) * e; }
+  else if (F.st === "def") { const e = Math.sin(k * Math.PI);
+    if (F.kind === "jump") { P.lift = 34 * e; P.tuck = e; P.arm = 0.7; P.sword = 1.2; }
+    else if (F.kind === "duck") { P.crouch = Math.min(1, e * 1.6); P.arm = 1.0; P.sword = 1.9; }
+    else { P.arm = 0.55; P.sword = 1.52; P.lean = -0.3 * Math.min(1, e * 1.6); P.reach = 0.8; } }
+  else if (F.st === "stun") { const e = 1 - ease(k); P.lean = -0.8 * e; P.arm = mix(0.25, 1.7, e); P.sword = mix(0.8, 2.3, e); }
+  else if (F.st === "taunt") { const e = Math.sin(k * Math.PI); P.arm = mix(0.25, 1.5, Math.min(1, e * 1.5)); P.sword = 1.57; P.hip = 1; P.lean = -0.1; }
+  else if (F.st === "fall") { P.fall = Math.min(1, F.t / 0.9); P.arm = 1.9; P.sword = 2.4; P.lean = -1; }
+  return P;
+}
+function drawFencer(c, x, gy, s, f, F, L, t) {
+  const P = duelPose(F, t), fallA = P.fall * 1.5, drop = P.fall * P.fall * 60 * s;
+  c.save(); c.translate(x - f * P.fall * 26 * s, gy + drop); c.rotate(-f * fallA); c.translate(0, -P.lift * s);
+  const legH = 36 * s * (1 - P.crouch * 0.5), hipX = f * P.lunge * 9 * s, hipY = -legH;
+  const shX = hipX + f * P.lean * 12 * s, shY = hipY - 30 * s * (1 - P.crouch * 0.2), hdX = shX + f * P.lean * 4 * s, hdY = shY - 12 * s;
+  c.lineCap = "round"; c.lineJoin = "round";
+  // shadow
+  if (!P.fall) { c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(hipX * 0.5, P.lift * s + 2 * s, 22 * s, 5 * s, 0, 0, TAU); c.fill(); }
+  // legs: back then front (boots)
+  const tuck = P.tuck * 14 * s, backFoot = -f * (11 - P.crouch * 2) * s, frontFoot = f * (11 + P.lunge * 16) * s;
+  const leg = (fx, kneeBias) => { const kx = (hipX + fx) / 2 + f * kneeBias * s, ky = hipY / 2 - tuck * 0.2; c.strokeStyle = L.pants; c.lineWidth = 7.5 * s; c.beginPath(); c.moveTo(hipX, hipY); c.lineTo(kx, ky); c.lineTo(fx, -tuck); c.stroke();
+    c.strokeStyle = "#1a120b"; c.lineWidth = 8 * s; c.beginPath(); c.moveTo(mix(kx, fx, 0.45), mix(ky, -tuck, 0.45)); c.lineTo(fx, -tuck); c.lineTo(fx + f * 6 * s, -tuck); c.stroke(); };
+  leg(backFoot, -3); leg(frontFoot, 5 + P.crouch * 6);
+  // off arm (on the hip when taunting, else trailing behind for balance)
+  c.strokeStyle = shade(L.coat, -0.25); c.lineWidth = 6.5 * s; c.beginPath(); c.moveTo(shX - f * 2 * s, shY + 2 * s);
+  if (P.hip) { c.lineTo(shX - f * 12 * s, shY + 14 * s); c.lineTo(hipX - f * 3 * s, hipY - 4 * s); } else { c.lineTo(shX - f * 12 * s, shY + 10 * s); c.lineTo(shX - f * 18 * s, shY - 2 * s + P.lean * 4 * s); }
+  c.stroke();
+  // coat with tails
+  c.fillStyle = L.coat; c.beginPath(); c.moveTo(shX - f * 8 * s, shY); c.lineTo(shX + f * 8 * s, shY + 1 * s); c.lineTo(hipX + f * 7 * s, hipY + 2 * s); c.lineTo(hipX - f * 2 * s, hipY + 12 * s); c.lineTo(hipX - f * 12 * s, hipY + 16 * s * (1 - P.crouch * 0.4)); c.closePath(); c.fill();
+  c.strokeStyle = L.trim; c.lineWidth = 1.6 * s; c.beginPath(); c.moveTo(shX + f * 5 * s, shY + 3 * s); c.lineTo(hipX + f * 5 * s, hipY + 1 * s); c.stroke();
+  c.fillStyle = L.trim; for (let i = 1; i <= 3; i++) { c.beginPath(); c.arc(mix(shX, hipX, i / 4) + f * 2.5 * s, mix(shY, hipY, i / 4), 1.1 * s, 0, TAU); c.fill(); }
+  c.fillStyle = L.trim; c.fillRect(hipX - 8 * s, hipY - 2 * s, 16 * s, 3 * s);
+  // head and hat
+  c.fillStyle = L.skin; c.beginPath(); c.arc(hdX, hdY, 7.5 * s, 0, TAU); c.fill();
+  c.fillStyle = "#1a120b"; c.beginPath(); c.arc(hdX + f * 3.2 * s, hdY - 1 * s, 0.9 * s, 0, TAU); c.fill();
+  c.fillStyle = L.hatCol;
+  if (L.hat === "cap") { c.fillRect(hdX - 8 * s, hdY - 10 * s, 16 * s, 5.5 * s); c.fillRect(hdX + (f > 0 ? 2 : -11) * s, hdY - 5.5 * s, 9 * s, 2 * s); c.fillStyle = L.trim; c.fillRect(hdX - 8 * s, hdY - 6.5 * s, 16 * s, 1.4 * s); }
+  else if (L.hat === "tricorn") { c.beginPath(); c.moveTo(hdX - 13 * s, hdY - 5 * s); c.lineTo(hdX, hdY - 15 * s); c.lineTo(hdX + 13 * s, hdY - 5 * s); c.quadraticCurveTo(hdX, hdY - 9 * s, hdX - 13 * s, hdY - 5 * s); c.fill(); }
+  else if (L.hat === "bowler") { c.beginPath(); c.arc(hdX, hdY - 5 * s, 7.5 * s, Math.PI, 0); c.fill(); c.fillRect(hdX - 11 * s, hdY - 6 * s, 22 * s, 2.2 * s); }
+  else if (L.hat === "tall") { c.fillRect(hdX - 5 * s, hdY - 22 * s, 10 * s, 15 * s); c.fillStyle = "#6a4a8a"; c.fillRect(hdX - 5 * s, hdY - 12 * s, 10 * s, 2 * s); }
+  else if (L.hat === "crest") { for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(hdX + i * 2.6 * s - 1.4 * s, hdY - 6 * s); c.lineTo(hdX + i * 3.6 * s - f * 3 * s, hdY - (15 - Math.abs(i) * 2) * s); c.lineTo(hdX + i * 2.6 * s + 1.4 * s, hdY - 6 * s); c.fill(); } }
+  // sword arm and blade
+  const aL = 19 * s * P.reach, hx = shX + f * Math.cos(P.arm) * aL, hy = shY + 3 * s - Math.sin(P.arm) * aL;
+  c.strokeStyle = L.coat; c.lineWidth = 6.5 * s; c.beginPath(); c.moveTo(shX + f * 3 * s, shY + 3 * s); c.lineTo(hx, hy); c.stroke();
+  c.fillStyle = L.skin; c.beginPath(); c.arc(hx, hy, 3.2 * s, 0, TAU); c.fill();
+  const bl = 34 * s, tx = hx + f * Math.cos(P.sword) * bl, ty = hy - Math.sin(P.sword) * bl;
+  c.strokeStyle = "#e9edf2"; c.lineWidth = 2.4 * s; c.beginPath(); c.moveTo(hx, hy); c.lineTo(tx, ty); c.stroke();
+  c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 0.9 * s; c.beginPath(); c.moveTo(mix(hx, tx, 0.2), mix(hy, ty, 0.2)); c.lineTo(tx, ty); c.stroke();
+  c.strokeStyle = "#c9a14a"; c.lineWidth = 3 * s; const gx = -Math.sin(P.sword), gy2 = -Math.cos(P.sword);
+  c.beginPath(); c.moveTo(hx + f * gx * 5 * s + f * Math.cos(P.sword) * 3 * s, hy + gy2 * 5 * s - Math.sin(P.sword) * 3 * s); c.lineTo(hx - f * gx * 5 * s + f * Math.cos(P.sword) * 3 * s, hy - gy2 * 5 * s - Math.sin(P.sword) * 3 * s); c.stroke();
+  c.restore();
+  return { tx: x + tx, ty: gy - P.lift * s + ty };
+}
+function drawDuel(t) {
+  const c = bc; c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const s = clamp(Math.min(MH / 560, MW / 520), 0.62, 1.5), gy = MH * (MW < 640 ? 0.6 : 0.68), step = 30 * s;
+  const sh = D.shake > 0 ? Math.sin(t / 18) * 5 * (D.shake / 0.18) : 0;
+  // sky: the aether, the enemy's funnel and rigging, the nearby world
+  c.fillStyle = "#0e131b"; c.fillRect(0, 0, MW, MH);
+  for (const st of stars) { c.fillStyle = `rgba(239,226,196,${st.a * 0.8})`; c.fillRect(st.x * MW, st.y * gy, st.s, st.s); }
+  if (B.bg && B.bg.world) { const R = MH * 0.5; c.fillStyle = shade(B.bg.world.col, -0.45); c.beginPath(); c.arc(MW * 0.82, gy + R * 0.55, R, 0, TAU); c.fill(); }
+  c.save(); c.translate(sh, 0);
+  const ox = MW / 2 - D.cam * step;   // screen x of the middle of the deck
+  // distant deck furniture, scrolling at half speed
+  const px = MW / 2 - D.cam * step * 0.5;
+  c.fillStyle = "#1b1611"; for (const m of [-520, -180, 200, 560]) { c.fillRect(px + m * s - 4 * s, gy - 250 * s, 8 * s, 250 * s); c.fillRect(px + m * s - 60 * s, gy - 205 * s, 120 * s, 4 * s); }
+  c.fillStyle = "#231c15"; c.fillRect(px - 60 * s, gy - 150 * s, 46 * s, 150 * s); c.fillRect(px + 320 * s, gy - 130 * s, 40 * s, 130 * s);
+  c.strokeStyle = "rgba(201,161,74,.18)"; c.lineWidth = 1; for (const m of [-520, -180, 200, 560]) { c.beginPath(); c.moveTo(px + m * s, gy - 250 * s); c.lineTo(px + (m + 170) * s, gy - 40 * s); c.moveTo(px + m * s, gy - 250 * s); c.lineTo(px + (m - 170) * s, gy - 40 * s); c.stroke(); }
+  // the crews brawling along the far rail
+  const nMe = D.crewMe0 ? Math.ceil(11 * D.crewMe / Math.max(D.crewMe0, D.crewFoe0)) : 0, nFoe = D.crewFoe0 ? Math.ceil(11 * D.crewFoe / Math.max(D.crewMe0, D.crewFoe0)) : 0; let iMe = 0, iFoe = 0;
+  for (const b of D.brawl) { if (b.side === 0 ? iMe++ >= nMe : iFoe++ >= nFoe) continue;
+    const bx = px + (b.x - 0.5) * 900 * s + Math.sin(t / 700 + b.ph) * 14 * s, by = gy - 44 * s + Math.abs(Math.sin(t / (90 * b.sp) + b.ph)) * -7 * s, col = b.side === 0 ? shade(D.lookMe.coat, -0.35) : shade(D.lookFoe.coat, -0.2);
+    c.fillStyle = col; c.fillRect(bx - 5 * s, by - 22 * s, 10 * s, 20 * s); c.beginPath(); c.arc(bx, by - 27 * s, 5 * s, 0, TAU); c.fill();
+    c.strokeStyle = "rgba(233,237,242,.5)"; c.lineWidth = 1.4 * s; const sa = Math.sin(t / (60 * b.sp) + b.ph) * 0.9 + (b.side ? Math.PI - 0.6 : 0.6); c.beginPath(); c.moveTo(bx, by - 16 * s); c.lineTo(bx + Math.cos(sa) * 17 * s, by - 16 * s - Math.sin(sa) * 17 * s); c.stroke(); }
+  // far rail
+  c.fillStyle = "#3a2818"; c.fillRect(-20, gy - 46 * s, MW + 40, 5 * s); c.fillStyle = "#2a1d12"; for (let x = ((ox % (38 * s)) + 38 * s) % (38 * s) - 38 * s; x < MW + 40; x += 38 * s) c.fillRect(x, gy - 42 * s, 4 * s, 42 * s);
+  // the deck, with its two ends
+  const dl = ox - (DUEL_LEN + 2.4) * step, dr = ox + (DUEL_LEN + 2.4) * step;
+  const g = c.createLinearGradient(0, gy - 4, 0, MH); g.addColorStop(0, "#8a6238"); g.addColorStop(1, "#4a3018"); c.fillStyle = g; c.fillRect(dl, gy - 4 * s, dr - dl, MH - gy + 4 * s);
+  c.strokeStyle = "rgba(30,18,8,.4)"; c.lineWidth = 1.2; for (let i = 1; i < 6; i++) { const y = gy + (MH - gy) * (i / 6) ** 1.5; c.beginPath(); c.moveTo(dl, y); c.lineTo(dr, y); c.stroke(); }
+  for (let x = dl; x < dr; x += 90 * s) { c.beginPath(); c.moveTo(x, gy - 4 * s); c.lineTo(x - (x - MW / 2) * 0.25, MH); c.stroke(); }
+  c.fillStyle = "#c9a14a"; c.fillRect(dl, gy - 6 * s, dr - dl, 3 * s);
+  c.fillStyle = "#0e131b"; c.fillRect(-40, gy - 6 * s, dl + 40, MH); c.fillRect(dr, gy - 6 * s, MW - dr + 40, MH);
+  for (const [ex, lab] of [[dl, "Your rail"], [dr, "Her taffrail"]]) { c.fillStyle = "#5c4416"; c.fillRect(ex - 4 * s, gy - 60 * s, 8 * s, 60 * s); c.fillStyle = "#c9a14a"; c.beginPath(); c.arc(ex, gy - 62 * s, 6 * s, 0, TAU); c.fill();
+    c.fillStyle = "rgba(239,226,196,.7)"; c.font = `${Math.round(13 * Math.max(1, s))}px "Alegreya Sans", system-ui, sans-serif`; c.textAlign = "center"; c.fillText(lab, ex, gy - 76 * s); }
+  // the captains
+  const cx = ox + D.p * step, gap = 31 * s, fy = gy + 26 * s;
+  const tipF = drawFencer(c, cx + gap, fy, s * 1.25, -1, D.foe, D.lookFoe, t), tipM = drawFencer(c, cx - gap, fy, s * 1.25, 1, D.me, D.lookMe, t);
+  for (const sp of D.sparks) { const a = sp.t / 0.3; if (sp.kind === "hit") { const hx = cx + sp.x * gap * 0.9, hy = fy - 62 * s; c.strokeStyle = `rgba(255,214,120,${a})`; c.lineWidth = 2.5 * s; for (let i = 0; i < 7; i++) { const an = i / 7 * TAU, r0 = (1 - a) * 12 * s + 4 * s; c.beginPath(); c.moveTo(hx + Math.cos(an) * r0, hy + Math.sin(an) * r0); c.lineTo(hx + Math.cos(an) * (r0 + 9 * s), hy + Math.sin(an) * (r0 + 9 * s)); c.stroke(); } }
+    else { c.fillStyle = `rgba(233,237,242,${a})`; c.beginPath(); c.arc(cx, fy - 70 * s, (1 - a) * 10 * s + 3 * s, 0, TAU); c.fill(); } }
+  // what the enemy is winding up, and how to answer it
+  if (D.foe.st === "wind" && !D.over) { const A = ATK[D.foe.kind]; c.textAlign = "center"; c.font = `${Math.round(22 * Math.max(0.85, s))}px "IM Fell English SC", Georgia, serif`;
+    const lab = `${A.n}! ${A.cue}`, w = c.measureText(lab).width, ly = fy - 150 * s; c.fillStyle = "rgba(14,19,27,.82)"; c.fillRect(cx + gap - w / 2 - 8, ly - 22, w + 16, 30); c.fillStyle = D.foe.kind === "chop" ? "#e0613f" : D.foe.kind === "thrust" ? "#e8c873" : "#8fb3c9"; c.fillText(lab, cx + gap, ly); }
+  c.restore();
+  // how far each captain has been driven
+  const bw = Math.min(MW - 40, 420), bx = (MW - bw) / 2, by = MH - (MW < 640 ? 196 : 108);
+  c.fillStyle = "rgba(36,24,15,.85)"; c.fillRect(bx, by, bw, 10); c.strokeStyle = "#c9a14a"; c.lineWidth = 1.5; c.strokeRect(bx, by, bw, 10);
+  c.fillStyle = "#7d6029"; c.fillRect(bx + bw / 2 - 1, by - 3, 2, 16); const mk = bx + bw / 2 + D.p / DUEL_LEN * bw / 2;
+  c.fillStyle = D.p >= 0 ? "#8fbf6a" : "#e0613f"; c.fillRect(Math.min(mk, bx + bw / 2), by + 2, Math.abs(mk - (bx + bw / 2)), 6); c.fillStyle = "#e8c873"; c.beginPath(); c.moveTo(mk, by - 6); c.lineTo(mk - 6, by - 14); c.lineTo(mk + 6, by - 14); c.closePath(); c.fill();
+  if (D.msgT > 0) { c.globalAlpha = clamp(D.msgT * 3, 0, 1); c.fillStyle = "#e8c873"; c.textAlign = "center"; c.font = `${MW < 640 ? 24 : 32}px "IM Fell English SC", Georgia, serif`; c.fillText(D.msg, MW / 2, MW < 640 ? 150 : 130); c.globalAlpha = 1; }
 }
 
 // ===================== BACKUPS AND UPDATES (0.27) =====================
@@ -2163,6 +2474,10 @@ function confirmCloud(back) {
 // ===================== TITLE, PAUSE MENU, MANUAL, CHANGELOG, ABOUT (0.26) =====================
 // Spoiler-free changelog, newest first.
 const CHANGELOG = [
+  { v: "0.31", items: [
+    "Boarding duels. When the hulls touch you may lead the boarders yourself and cross swords with the enemy captain while the crews fight behind you.",
+    "Three attacks, each answered by its own defence, and a choice of sabre, rapier or cutlass. Drive the enemy captain to the far end of the deck to take the ship.",
+    "You can still let the crew settle a boarding without you." ] },
   { v: "0.30", items: [
     "The heliograph network, first part: play alongside friends. One captain opens a circuit and shares its code; up to three more join.",
     "Captains on your circuit appear on your chart wherever they are in their own voyage. Sail near one to hail her and exchange signals.",
@@ -2312,7 +2627,17 @@ const MANUAL = [
       <li><b>Chain shot</b> wrecks the ether vanes so she can't run.</li>
       <li><b>Canister</b> is short-ranged and cuts down her crew.</li>
     </ul>
-    <p>A ship with no vanes or no fight left strikes her colours. Close in and your crew will board her. Wreck her hull and she explodes. Break away far enough and the battle ends.</p>
+    <p>A ship with no vanes or no fight left strikes her colours. Wreck her hull and she explodes. Break away far enough and the battle ends.</p>
+    <h3>Boarding duels</h3>
+    <p>Lay your ship against hers and the grappling hooks fly. You may <b>let the crew settle it</b>, or <b>lead the boarders</b> and fight the enemy captain yourself.</p>
+    <p>In a duel every attack has one defence that stops it. The enemy's blow is called out as it is wound up, so watch for it.</p>
+    <ul>
+      <li><b>Chop</b> is slow and drives the enemy back furthest. <b>Duck</b> under it.</li>
+      <li><b>Thrust</b> is quick and gains a little ground. <b>Parry</b> it.</li>
+      <li><b>Slash</b> lies between the two. <b>Jump</b> over it.</li>
+    </ul>
+    <p>A blow that lands drives the loser back along the deck. Stop a blow and you may answer at once with a faster one. Drive the enemy captain to the far rail and the ship is yours; be driven to your own and you are beaten.</p>
+    <p>Meanwhile the crews fight behind you. The bar at the top shows who is winning; the side with the upper hand lends its captain speed. A <b>taunt</b> heartens your crew, but leaves you open. The sabre is balanced, the rapier quicker with a shorter guard, the cutlass slower but harder-hitting.</p>
     <h3>Prizes</h3>
     <p>A captured ship gives up her gold, some of her crew and her cargo. You can add her to your fleet or make her your flagship. If you lose your flagship, your best remaining ship takes over; with no fleet, you'll be put ashore poorer but alive.</p>` },
   { t: "Nations", h: `
@@ -2355,6 +2680,13 @@ const MANUAL = [
       <tr><td></td><td>C or /</td><td>Fire canister</td></tr>
       <tr><td></td><td>B</td><td>Stoke or bank the boilers</td></tr>
       <tr><td></td><td>P or Esc</td><td>Pause</td></tr>
+      <tr><td>Boarding duel</td><td>Z or ,</td><td>Chop: slow, drives the enemy back furthest</td></tr>
+      <tr><td></td><td>X or .</td><td>Thrust: quick, a short step back</td></tr>
+      <tr><td></td><td>C or /</td><td>Slash: between the two</td></tr>
+      <tr><td></td><td>Down arrow or S</td><td>Duck under a chop</td></tr>
+      <tr><td></td><td>Left or right arrow, A or D</td><td>Parry a thrust</td></tr>
+      <tr><td></td><td>Up arrow or W</td><td>Jump over a slash</td></tr>
+      <tr><td></td><td>T</td><td>Taunt, to hearten your crew</td></tr>
       <tr><td>On a phone</td><td>On-screen buttons</td><td>Battle has steering buttons on the left, and pause, sail, boilers and each kind of shot on the right</td></tr>
     </tbody></table>` }
 ];
@@ -2423,13 +2755,13 @@ function changelogScreen(back) {
 // ---------- pause ----------
 let gamePaused = false, menuFrom = null;
 function openMenu() {
-  if (gamePaused || !G || !["map", "battle", "port"].includes(mode)) return;
+  if (gamePaused || !G || !["map", "battle", "port", "duel"].includes(mode) || (B && B.hold)) return;
   menuFrom = mode; gamePaused = true;
   for (const k in keys) keys[k] = false; for (const k in hold) hold[k] = false;
   pauseMenu();
 }
 function pauseMenu() {
-  const inBattle = menuFrom === "battle";
+  const inBattle = menuFrom === "battle" || menuFrom === "duel";
   showPanel(`
     <header><div><h2 id="pTitle">Paused</h2><div class="tag">${dateStr(G.day)} · ${rankOf()} ${esc(G.captain)}</div></div><div class="tag">Version ${VERSION}</div></header>
     <div class="body"><div style="display:grid;gap:8px;max-width:340px;margin:0 auto">
@@ -2794,7 +3126,9 @@ addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   if (gamePaused) { panelKey(e); return; }
   const lk = e.key.toLowerCase();
-  if ((lk === "p" || lk === "escape") && (mode === "map" || mode === "battle" || mode === "port")) { e.preventDefault(); openMenu(); return; }
+  if ((lk === "p" || lk === "escape") && (mode === "map" || mode === "battle" || mode === "port" || mode === "duel") && !(B && B.hold)) { e.preventDefault(); openMenu(); return; }
+  if (mode === "duel") { duelKey(e); return; }
+  if (mode === "battle" && B && B.hold) { panelKey(e); return; }
   keys[lk] = true;
   if (mode === "map") {
     if (e.key === " ") { e.preventDefault(); togglePause(); }
@@ -3489,7 +3823,7 @@ function stepBattle(dt) {
   // boarding
   B.boardCd -= dt;
   const dist = Math.hypot(m.x - f.x, m.y - f.y);
-  if (dist < (m.r + f.r) * 0.85 && B.boardCd <= 0) { board(); if (B.over) return; }
+  if (dist < (m.r + f.r) * 0.85 && B.boardCd <= 0) { boardingPanel(); return; }
   // outcomes
   if (f.hull <= 0) return endBattle("sunk");
   if (m.hull <= 0) return endBattle("lost");
@@ -3734,7 +4068,8 @@ $("btnOff").onclick = () => officersScreen();
 $("btnMenu").onclick = openMenu;
 $("btnFleet").onclick = () => fleetScreen();
 $("hNet").onclick = () => { if (mode === "map") { NET.back = null; netScreen(); } };
-$("bPause").onclick = openMenu;
+$("bPause").onclick = openMenu; $("dPause").onclick = openMenu;
+document.querySelectorAll("#dCtl [data-act]").forEach(b => b.addEventListener("pointerdown", e => { e.preventDefault(); if (D && !D.over && !gamePaused) duelAct(D.me, b.dataset.act); }));
 $("gaugeToggle").onclick = () => { const g = $("gauges"), o = !g.classList.contains("open"); g.classList.toggle("open", o); $("gaugeToggle").setAttribute("aria-expanded", o); };
 
 function frame(now) {
@@ -3746,7 +4081,8 @@ function frame(now) {
       if (now - hudT > 150) { hudT = now; if (mode === "map") updateHud(); }
     }
     if (mode === "dive" && DIVE) stepDive(dt, now);
-    else if (mode === "battle" && B) { if (!gamePaused) stepBattle(dt); drawBattle(now); }
+    else if (mode === "duel" && D) { if (!gamePaused) stepDuel(dt); if (D) drawDuel(now); else if (B) drawBattle(now); }
+    else if (mode === "battle" && B) { if (!gamePaused && !B.hold) stepBattle(dt); drawBattle(now); }
     else drawMap(now);
   } else { // title backdrop: a slowly turning orrery
     G_preview.day += dt * 6; const keep = G; G = G_preview; drawMap(now); G = keep;
