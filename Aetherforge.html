@@ -130,6 +130,15 @@ input.f,select.f{width:100%;box-sizing:border-box;background:#170f09;border:1.5p
 .log .d{color:var(--fg-3);font-size:13px;margin-right:6px}
 
 /* Battle */
+canvas.scene{display:block;width:100%;height:130px;border:1px solid var(--brass-lo);border-radius:4px;margin-bottom:10px;max-width:100%}
+canvas.scene.wide{height:170px}
+canvas.scene.tall{height:210px}
+.facts{margin:0;padding-left:1.1em;font-size:14px;color:var(--parch)} .facts li{margin:2px 0}
+.choices.one{grid-template-columns:1fr;margin-top:4px}
+.xbar{display:flex;gap:4px;margin:0 0 10px} .xbar i{flex:1;height:6px;border:1px solid var(--brass-lo);border-radius:3px;background:#170f09} .xbar i.on{background:var(--brass)}
+.chks{display:grid;gap:6px} .chk{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:15px;color:var(--parch)} .chk input{width:18px;height:18px;accent-color:var(--brass)}
+.b[disabled]{opacity:.45;cursor:default}
+@media (max-width:640px){canvas.scene.wide{height:130px} canvas.scene.tall{height:150px}}
 #dhud{position:fixed;inset:0;pointer-events:none;z-index:10}
 #dhud>*{pointer-events:auto}
 #dTop{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:12px;right:12px;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;padding:8px 12px}
@@ -233,6 +242,7 @@ input.f,select.f{width:100%;box-sizing:border-box;background:#170f09;border:1.5p
     <button class="b sm" id="btnZoomOut" aria-label="Zoom out">−</button>
     <button class="b sm" id="btnZoomIn" aria-label="Zoom in">+</button>
     <button class="b" id="btnMenu" title="Pause menu (P)"><span class="key">P</span>Menu</button>
+    <button class="b" id="btnHold" hidden>Holdings</button>
     <button class="b" id="btnFleet" hidden>Fleet</button>
     <button class="b" id="btnOff">Officers</button>
     <button class="b" id="btnCaptain">Captain</button>
@@ -923,7 +933,7 @@ function drawPortrait(cv,b,frame){
 }
 
 // ===================== AETHERFORGE DATA =====================
-const VERSION = "0.31";
+const VERSION = "0.32";
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -1162,6 +1172,7 @@ function ensureV2() {
   if (!G.ship.up) { G.ship.up = noUps(); G.ship.upSpent = 0; }
   if (!G.gid) G.gid = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
   if (G.lastPrize == null) G.lastPrize = Math.floor(G.day);
+  ensureLand();
   G.v = VERSION;
 }
 const officerAt = post => G.officers.find(o => o.post === post);
@@ -2059,12 +2070,23 @@ function startDuel(sword, cap) {
 }
 const newFighter = () => ({ st: "idle", t: 0, dur: 0, kind: null, rip: 0, off: false });
 function duelLook(a) {
-  if (a === "player") { const coat = { gb: "#a8322a", de: "#3c4a5c", fr: "#2f4f8f", ru: "#2f6b4a" }[G.nation] || "#a8322a"; return { coat, trim: "#e8c873", skin: "#e2b48c", pants: "#efe2c4", hat: "cap", hatCol: "#1d1a17" }; }
-  if (a.corsair) return { coat: "#3a2420", trim: "#c9a14a", skin: "#7a2a22", pants: "#2a1d12", hat: "crest", hatCol: "#1a120b" };
-  if (a.nat === "mars") return { coat: "#6a4a8a", trim: "#e0b45a", skin: "#c9a06c", pants: "#d9a85a", hat: "tall", hatCol: "#e0b45a" };
-  if (a.role === "pirate") return { coat: "#26221f", trim: "#7a2a22", skin: "#d9a57c", pants: "#5a4a3a", hat: "tricorn", hatCol: "#151210" };
-  if (a.role === "navy") return { coat: "#1f2c44", trim: NATIONS[a.nat].col, skin: "#e2b48c", pants: "#e3e3df", hat: "cap", hatCol: "#101827" };
-  return { coat: "#6b4a2b", trim: "#c9c3b4", skin: "#e2b48c", pants: "#3b3f44", hat: "bowler", hatCol: "#2a2a2a" };
+  if (a === "player") { const coat = { gb: "#a8322a", de: "#3c4a5c", fr: "#2f4f8f", ru: "#2f6b4a" }[G.nation] || "#a8322a";
+    return { coat, trim: "#e8c873", skin: "#e2b48c", pants: "#efe2c4", hat: "cap", hatCol: "#1d1a17", blade: G.sword || "sabre", hair: "#5a3a22", epaulette: G.rank >= 2 }; }
+  if (a.corsair) return { coat: "#3a2420", trim: "#c9a14a", skin: "#9a3a2c", pants: "#2a1d12", hat: "crest", hatCol: "#1a120b", blade: "scimitar", hair: "#1a0c08", sash: "#c9a14a", glove: "#5a1a14" };
+  if (a.nat === "mars") return { coat: "#6a4a8a", trim: "#e0b45a", skin: "#c9a06c", pants: "#d9a85a", hat: "tall", hatCol: "#e0b45a", blade: "rapier", hair: "#2a1a10", sash: "#8a2a4a", boot: "#3a2418" };
+  if (a.role === "pirate") return { coat: "#2c2622", trim: "#9a3a2a", skin: "#d9a57c", pants: "#5a4a3a", hat: "tricorn", hatCol: "#1d1814", blade: "cutlass", beard: "full", hair: "#1a120b", sash: "#7a2a22", boot: "#2a1a10" };
+  if (a.role === "navy") return { coat: "#1f2c44", trim: "#e8c873", skin: "#e2b48c", pants: "#e3e3df", hat: "cap", hatCol: "#101827", blade: "sabre", beard: "chops", hair: "#6a4a30", epaulette: true };
+  return { coat: "#6b4a2b", trim: "#c9c3b4", skin: "#e2b48c", pants: "#3b3f44", hat: "topper", hatCol: "#222", blade: "rapier", beard: "moustache", hair: "#4a3424", buttons: "#c9a14a" };
+}
+// Background brawlers: the same figures, in the dim colours of their side.
+function crewLook(L, side) { const k = side ? -0.45 : -0.5;
+  return { coat: shade(L.coat, k), trim: shade(L.trim, -0.55), skin: shade(side && L.skin === "#9a3a2c" ? L.skin : "#c89a74", -0.55), pants: shade(L.pants, -0.6), hat: side && L.hat === "tricorn" ? "tricorn" : side && L.hat === "crest" ? "crest" : "none",
+    hatCol: shade(L.hatCol, -0.3), blade: side ? (L.blade === "rapier" ? "sabre" : L.blade) : "cutlass", hair: "#140d08", boot: "#120c08", shirt: "#6a6458", belt: "#140d08", buttons: shade(L.trim, -0.55) }; }
+const BRAWL = [["wind", "chop", 0.62], ["strike", "chop", 0.14], ["rec", "chop", 0.5], ["idle", null, 0.5], ["wind", "slash", 0.48], ["strike", "slash", 0.14], ["rec", "slash", 0.4], ["def", "parry", 0.45], ["idle", null, 0.6], ["def", "duck", 0.45]];
+function brawlPose(b, t) { // loop through a little fight of its own
+  let u = (t / 1000 * b.sp * 0.35 + b.ph) % 4.29;
+  for (const [st, kind, dur] of BRAWL) { if (u < dur) return { st, kind, t: u, dur }; u -= dur; }
+  return { st: "idle", t: 0, dur: 1 };
 }
 
 // ---------- rules ----------
@@ -2183,49 +2205,6 @@ function duelPose(F, t) {
   else if (F.st === "fall") { P.fall = Math.min(1, F.t / 0.9); P.arm = 1.9; P.sword = 2.4; P.lean = -1; }
   return P;
 }
-function drawFencer(c, x, gy, s, f, F, L, t) {
-  const P = duelPose(F, t), fallA = P.fall * 1.5, drop = P.fall * P.fall * 60 * s;
-  c.save(); c.translate(x - f * P.fall * 26 * s, gy + drop); c.rotate(-f * fallA); c.translate(0, -P.lift * s);
-  const legH = 36 * s * (1 - P.crouch * 0.5), hipX = f * P.lunge * 9 * s, hipY = -legH;
-  const shX = hipX + f * P.lean * 12 * s, shY = hipY - 30 * s * (1 - P.crouch * 0.2), hdX = shX + f * P.lean * 4 * s, hdY = shY - 12 * s;
-  c.lineCap = "round"; c.lineJoin = "round";
-  // shadow
-  if (!P.fall) { c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(hipX * 0.5, P.lift * s + 2 * s, 22 * s, 5 * s, 0, 0, TAU); c.fill(); }
-  // legs: back then front (boots)
-  const tuck = P.tuck * 14 * s, backFoot = -f * (11 - P.crouch * 2) * s, frontFoot = f * (11 + P.lunge * 16) * s;
-  const leg = (fx, kneeBias) => { const kx = (hipX + fx) / 2 + f * kneeBias * s, ky = hipY / 2 - tuck * 0.2; c.strokeStyle = L.pants; c.lineWidth = 7.5 * s; c.beginPath(); c.moveTo(hipX, hipY); c.lineTo(kx, ky); c.lineTo(fx, -tuck); c.stroke();
-    c.strokeStyle = "#1a120b"; c.lineWidth = 8 * s; c.beginPath(); c.moveTo(mix(kx, fx, 0.45), mix(ky, -tuck, 0.45)); c.lineTo(fx, -tuck); c.lineTo(fx + f * 6 * s, -tuck); c.stroke(); };
-  leg(backFoot, -3); leg(frontFoot, 5 + P.crouch * 6);
-  // off arm (on the hip when taunting, else trailing behind for balance)
-  c.strokeStyle = shade(L.coat, -0.25); c.lineWidth = 6.5 * s; c.beginPath(); c.moveTo(shX - f * 2 * s, shY + 2 * s);
-  if (P.hip) { c.lineTo(shX - f * 12 * s, shY + 14 * s); c.lineTo(hipX - f * 3 * s, hipY - 4 * s); } else { c.lineTo(shX - f * 12 * s, shY + 10 * s); c.lineTo(shX - f * 18 * s, shY - 2 * s + P.lean * 4 * s); }
-  c.stroke();
-  // coat with tails
-  c.fillStyle = L.coat; c.beginPath(); c.moveTo(shX - f * 8 * s, shY); c.lineTo(shX + f * 8 * s, shY + 1 * s); c.lineTo(hipX + f * 7 * s, hipY + 2 * s); c.lineTo(hipX - f * 2 * s, hipY + 12 * s); c.lineTo(hipX - f * 12 * s, hipY + 16 * s * (1 - P.crouch * 0.4)); c.closePath(); c.fill();
-  c.strokeStyle = L.trim; c.lineWidth = 1.6 * s; c.beginPath(); c.moveTo(shX + f * 5 * s, shY + 3 * s); c.lineTo(hipX + f * 5 * s, hipY + 1 * s); c.stroke();
-  c.fillStyle = L.trim; for (let i = 1; i <= 3; i++) { c.beginPath(); c.arc(mix(shX, hipX, i / 4) + f * 2.5 * s, mix(shY, hipY, i / 4), 1.1 * s, 0, TAU); c.fill(); }
-  c.fillStyle = L.trim; c.fillRect(hipX - 8 * s, hipY - 2 * s, 16 * s, 3 * s);
-  // head and hat
-  c.fillStyle = L.skin; c.beginPath(); c.arc(hdX, hdY, 7.5 * s, 0, TAU); c.fill();
-  c.fillStyle = "#1a120b"; c.beginPath(); c.arc(hdX + f * 3.2 * s, hdY - 1 * s, 0.9 * s, 0, TAU); c.fill();
-  c.fillStyle = L.hatCol;
-  if (L.hat === "cap") { c.fillRect(hdX - 8 * s, hdY - 10 * s, 16 * s, 5.5 * s); c.fillRect(hdX + (f > 0 ? 2 : -11) * s, hdY - 5.5 * s, 9 * s, 2 * s); c.fillStyle = L.trim; c.fillRect(hdX - 8 * s, hdY - 6.5 * s, 16 * s, 1.4 * s); }
-  else if (L.hat === "tricorn") { c.beginPath(); c.moveTo(hdX - 13 * s, hdY - 5 * s); c.lineTo(hdX, hdY - 15 * s); c.lineTo(hdX + 13 * s, hdY - 5 * s); c.quadraticCurveTo(hdX, hdY - 9 * s, hdX - 13 * s, hdY - 5 * s); c.fill(); }
-  else if (L.hat === "bowler") { c.beginPath(); c.arc(hdX, hdY - 5 * s, 7.5 * s, Math.PI, 0); c.fill(); c.fillRect(hdX - 11 * s, hdY - 6 * s, 22 * s, 2.2 * s); }
-  else if (L.hat === "tall") { c.fillRect(hdX - 5 * s, hdY - 22 * s, 10 * s, 15 * s); c.fillStyle = "#6a4a8a"; c.fillRect(hdX - 5 * s, hdY - 12 * s, 10 * s, 2 * s); }
-  else if (L.hat === "crest") { for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(hdX + i * 2.6 * s - 1.4 * s, hdY - 6 * s); c.lineTo(hdX + i * 3.6 * s - f * 3 * s, hdY - (15 - Math.abs(i) * 2) * s); c.lineTo(hdX + i * 2.6 * s + 1.4 * s, hdY - 6 * s); c.fill(); } }
-  // sword arm and blade
-  const aL = 19 * s * P.reach, hx = shX + f * Math.cos(P.arm) * aL, hy = shY + 3 * s - Math.sin(P.arm) * aL;
-  c.strokeStyle = L.coat; c.lineWidth = 6.5 * s; c.beginPath(); c.moveTo(shX + f * 3 * s, shY + 3 * s); c.lineTo(hx, hy); c.stroke();
-  c.fillStyle = L.skin; c.beginPath(); c.arc(hx, hy, 3.2 * s, 0, TAU); c.fill();
-  const bl = 34 * s, tx = hx + f * Math.cos(P.sword) * bl, ty = hy - Math.sin(P.sword) * bl;
-  c.strokeStyle = "#e9edf2"; c.lineWidth = 2.4 * s; c.beginPath(); c.moveTo(hx, hy); c.lineTo(tx, ty); c.stroke();
-  c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 0.9 * s; c.beginPath(); c.moveTo(mix(hx, tx, 0.2), mix(hy, ty, 0.2)); c.lineTo(tx, ty); c.stroke();
-  c.strokeStyle = "#c9a14a"; c.lineWidth = 3 * s; const gx = -Math.sin(P.sword), gy2 = -Math.cos(P.sword);
-  c.beginPath(); c.moveTo(hx + f * gx * 5 * s + f * Math.cos(P.sword) * 3 * s, hy + gy2 * 5 * s - Math.sin(P.sword) * 3 * s); c.lineTo(hx - f * gx * 5 * s + f * Math.cos(P.sword) * 3 * s, hy - gy2 * 5 * s - Math.sin(P.sword) * 3 * s); c.stroke();
-  c.restore();
-  return { tx: x + tx, ty: gy - P.lift * s + ty };
-}
 function drawDuel(t) {
   const c = bc; c.setTransform(DPR, 0, 0, DPR, 0, 0);
   const s = clamp(Math.min(MH / 560, MW / 520), 0.62, 1.5), gy = MH * (MW < 640 ? 0.6 : 0.68), step = 30 * s;
@@ -2241,12 +2220,12 @@ function drawDuel(t) {
   c.fillStyle = "#1b1611"; for (const m of [-520, -180, 200, 560]) { c.fillRect(px + m * s - 4 * s, gy - 250 * s, 8 * s, 250 * s); c.fillRect(px + m * s - 60 * s, gy - 205 * s, 120 * s, 4 * s); }
   c.fillStyle = "#231c15"; c.fillRect(px - 60 * s, gy - 150 * s, 46 * s, 150 * s); c.fillRect(px + 320 * s, gy - 130 * s, 40 * s, 130 * s);
   c.strokeStyle = "rgba(201,161,74,.18)"; c.lineWidth = 1; for (const m of [-520, -180, 200, 560]) { c.beginPath(); c.moveTo(px + m * s, gy - 250 * s); c.lineTo(px + (m + 170) * s, gy - 40 * s); c.moveTo(px + m * s, gy - 250 * s); c.lineTo(px + (m - 170) * s, gy - 40 * s); c.stroke(); }
-  // the crews brawling along the far rail
-  const nMe = D.crewMe0 ? Math.ceil(11 * D.crewMe / Math.max(D.crewMe0, D.crewFoe0)) : 0, nFoe = D.crewFoe0 ? Math.ceil(11 * D.crewFoe / Math.max(D.crewMe0, D.crewFoe0)) : 0; let iMe = 0, iFoe = 0;
-  for (const b of D.brawl) { if (b.side === 0 ? iMe++ >= nMe : iFoe++ >= nFoe) continue;
-    const bx = px + (b.x - 0.5) * 900 * s + Math.sin(t / 700 + b.ph) * 14 * s, by = gy - 44 * s + Math.abs(Math.sin(t / (90 * b.sp) + b.ph)) * -7 * s, col = b.side === 0 ? shade(D.lookMe.coat, -0.35) : shade(D.lookFoe.coat, -0.2);
-    c.fillStyle = col; c.fillRect(bx - 5 * s, by - 22 * s, 10 * s, 20 * s); c.beginPath(); c.arc(bx, by - 27 * s, 5 * s, 0, TAU); c.fill();
-    c.strokeStyle = "rgba(233,237,242,.5)"; c.lineWidth = 1.4 * s; const sa = Math.sin(t / (60 * b.sp) + b.ph) * 0.9 + (b.side ? Math.PI - 0.6 : 0.6); c.beginPath(); c.moveTo(bx, by - 16 * s); c.lineTo(bx + Math.cos(sa) * 17 * s, by - 16 * s - Math.sin(sa) * 17 * s); c.stroke(); }
+  // the crews brawling along the far rail, in pairs
+  const big = Math.max(D.crewMe0, D.crewFoe0, 1), nMe = Math.ceil(11 * D.crewMe / big), nFoe = Math.ceil(11 * D.crewFoe / big);
+  if (!D.cl) D.cl = [crewLook(D.lookMe, 0), crewLook(D.lookFoe, 1)];
+  for (let i = 0; i < 11; i++) { const b0 = D.brawl[i * 2], b1 = D.brawl[i * 2 + 1], bx = px + (i - 5) * 92 * s + Math.sin(t / 1300 + b0.ph) * 10 * s, by = gy - 12 * s;
+    if (i < nMe) drawFencer2(c, bx - 20 * s, by, s * 0.5, 1, brawlPose(b0, t), D.cl[0], t);
+    if (i < nFoe) drawFencer2(c, bx + 20 * s, by, s * 0.5, -1, brawlPose(b1, t), D.cl[1], t); }
   // far rail
   c.fillStyle = "#3a2818"; c.fillRect(-20, gy - 46 * s, MW + 40, 5 * s); c.fillStyle = "#2a1d12"; for (let x = ((ox % (38 * s)) + 38 * s) % (38 * s) - 38 * s; x < MW + 40; x += 38 * s) c.fillRect(x, gy - 42 * s, 4 * s, 42 * s);
   // the deck, with its two ends
@@ -2259,13 +2238,15 @@ function drawDuel(t) {
   for (const [ex, lab] of [[dl, "Your rail"], [dr, "Her taffrail"]]) { c.fillStyle = "#5c4416"; c.fillRect(ex - 4 * s, gy - 60 * s, 8 * s, 60 * s); c.fillStyle = "#c9a14a"; c.beginPath(); c.arc(ex, gy - 62 * s, 6 * s, 0, TAU); c.fill();
     c.fillStyle = "rgba(239,226,196,.7)"; c.font = `${Math.round(13 * Math.max(1, s))}px "Alegreya Sans", system-ui, sans-serif`; c.textAlign = "center"; c.fillText(lab, ex, gy - 76 * s); }
   // the captains
-  const cx = ox + D.p * step, gap = 31 * s, fy = gy + 26 * s;
-  const tipF = drawFencer(c, cx + gap, fy, s * 1.25, -1, D.foe, D.lookFoe, t), tipM = drawFencer(c, cx - gap, fy, s * 1.25, 1, D.me, D.lookMe, t);
-  for (const sp of D.sparks) { const a = sp.t / 0.3; if (sp.kind === "hit") { const hx = cx + sp.x * gap * 0.9, hy = fy - 62 * s; c.strokeStyle = `rgba(255,214,120,${a})`; c.lineWidth = 2.5 * s; for (let i = 0; i < 7; i++) { const an = i / 7 * TAU, r0 = (1 - a) * 12 * s + 4 * s; c.beginPath(); c.moveTo(hx + Math.cos(an) * r0, hy + Math.sin(an) * r0); c.lineTo(hx + Math.cos(an) * (r0 + 9 * s), hy + Math.sin(an) * (r0 + 9 * s)); c.stroke(); } }
-    else { c.fillStyle = `rgba(233,237,242,${a})`; c.beginPath(); c.arc(cx, fy - 70 * s, (1 - a) * 10 * s + 3 * s, 0, TAU); c.fill(); } }
+  const cx = ox + D.p * step, gap = 46 * s, fy = gy + 30 * s;
+  // lantern light on the deck around the two captains
+  { c.save(); c.globalCompositeOperation = "lighter"; const lg = c.createRadialGradient(cx, fy - 70 * s, 0, cx, fy - 70 * s, 260 * s); lg.addColorStop(0, "rgba(255,190,110,.20)"); lg.addColorStop(1, "rgba(255,190,110,0)"); c.fillStyle = lg; c.fillRect(cx - 270 * s, fy - 340 * s, 540 * s, 400 * s); c.restore(); }
+  const tipF = drawFencer2(c, cx + gap, fy, s * 1.4, -1, D.foe, D.lookFoe, t), tipM = drawFencer2(c, cx - gap, fy, s * 1.4, 1, D.me, D.lookMe, t);
+  for (const sp of D.sparks) { const a = sp.t / 0.3; if (sp.kind === "hit") { const hx = cx + sp.x * gap * 0.9, hy = fy - 95 * s; c.strokeStyle = `rgba(255,214,120,${a})`; c.lineWidth = 2.5 * s; for (let i = 0; i < 7; i++) { const an = i / 7 * TAU, r0 = (1 - a) * 12 * s + 4 * s; c.beginPath(); c.moveTo(hx + Math.cos(an) * r0, hy + Math.sin(an) * r0); c.lineTo(hx + Math.cos(an) * (r0 + 9 * s), hy + Math.sin(an) * (r0 + 9 * s)); c.stroke(); } }
+    else { c.fillStyle = `rgba(233,237,242,${a})`; c.beginPath(); c.arc(cx, fy - 105 * s, (1 - a) * 10 * s + 3 * s, 0, TAU); c.fill(); } }
   // what the enemy is winding up, and how to answer it
   if (D.foe.st === "wind" && !D.over) { const A = ATK[D.foe.kind]; c.textAlign = "center"; c.font = `${Math.round(22 * Math.max(0.85, s))}px "IM Fell English SC", Georgia, serif`;
-    const lab = `${A.n}! ${A.cue}`, w = c.measureText(lab).width, ly = fy - 150 * s; c.fillStyle = "rgba(14,19,27,.82)"; c.fillRect(cx + gap - w / 2 - 8, ly - 22, w + 16, 30); c.fillStyle = D.foe.kind === "chop" ? "#e0613f" : D.foe.kind === "thrust" ? "#e8c873" : "#8fb3c9"; c.fillText(lab, cx + gap, ly); }
+    const lab = `${A.n}! ${A.cue}`, w = c.measureText(lab).width, ly = fy - 185 * s; c.fillStyle = "rgba(14,19,27,.82)"; c.fillRect(cx + gap - w / 2 - 8, ly - 22, w + 16, 30); c.fillStyle = D.foe.kind === "chop" ? "#e0613f" : D.foe.kind === "thrust" ? "#e8c873" : "#8fb3c9"; c.fillText(lab, cx + gap, ly); }
   c.restore();
   // how far each captain has been driven
   const bw = Math.min(MW - 40, 420), bx = (MW - bw) / 2, by = MH - (MW < 640 ? 196 : 108);
@@ -2273,6 +2254,208 @@ function drawDuel(t) {
   c.fillStyle = "#7d6029"; c.fillRect(bx + bw / 2 - 1, by - 3, 2, 16); const mk = bx + bw / 2 + D.p / DUEL_LEN * bw / 2;
   c.fillStyle = D.p >= 0 ? "#8fbf6a" : "#e0613f"; c.fillRect(Math.min(mk, bx + bw / 2), by + 2, Math.abs(mk - (bx + bw / 2)), 6); c.fillStyle = "#e8c873"; c.beginPath(); c.moveTo(mk, by - 6); c.lineTo(mk - 6, by - 14); c.lineTo(mk + 6, by - 14); c.closePath(); c.fill();
   if (D.msgT > 0) { c.globalAlpha = clamp(D.msgT * 3, 0, 1); c.fillStyle = "#e8c873"; c.textAlign = "center"; c.font = `${MW < 640 ? 24 : 32}px "IM Fell English SC", Georgia, serif`; c.fillText(D.msg, MW / 2, MW < 640 ? 150 : 130); c.globalAlpha = 1; }
+}
+
+// ===================== BOARDING DUEL FIGURES, v2 (0.32) =====================
+// Jointed, shaded fencers: two-bone legs and arms, coat with swinging tails, faces in profile,
+// boots, hats and a proper blade for each kind of sword. Drawn facing right, mirrored for the foe.
+// Units: a standing figure is about 100 units tall; s scales units to pixels.
+
+const FIG = { thigh: 23, shin: 23, upper: 17, fore: 16, torso: 30, neck: 4, head: 12 };
+
+// Fill in the details a look needs (boots, shirt, hair, beard, blade) from its basic colours.
+function lookDetail(L) {
+  return Object.assign({ boot: "#1d140d", shirt: "#efe8d8", hair: "#3b2618", beard: null, blade: "sabre", glove: null, belt: "#2a1d12", sash: null, buttons: L.trim }, L);
+}
+
+// Two-bone IK: from root (x0,y0) to target (x1,y1); bend = +1 bends the joint toward +x/down side.
+function ik2(x0, y0, x1, y1, a, b, bend) {
+  let dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
+  const maxd = (a + b) * 0.999; if (d > maxd) { dx *= maxd / d; dy *= maxd / d; d = maxd; }
+  const ang = Math.atan2(dy, dx), cosA = clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1), A = Math.acos(cosA) * bend;
+  const jx = x0 + Math.cos(ang - A) * a, jy = y0 + Math.sin(ang - A) * a;
+  return { jx, jy, ex: x0 + dx, ey: y0 + dy };
+}
+// A tapered limb segment with shading: dark underside, lit upper edge.
+function limb(c, x0, y0, x1, y1, w0, w1, col, lit) {
+  const a = Math.atan2(y1 - y0, x1 - x0), nx = -Math.sin(a), ny = Math.cos(a);
+  const seg = (k, off, colr) => {
+    c.fillStyle = colr; c.beginPath();
+    c.moveTo(x0 + nx * w0 * k + off.x, y0 + ny * w0 * k + off.y); c.lineTo(x1 + nx * w1 * k + off.x, y1 + ny * w1 * k + off.y);
+    c.arc(x1 + off.x, y1 + off.y, w1 * k, a + Math.PI / 2, a - Math.PI / 2, true);
+    c.lineTo(x0 - nx * w0 * k + off.x, y0 - ny * w0 * k + off.y);
+    c.arc(x0 + off.x, y0 + off.y, w0 * k, a - Math.PI / 2, a + Math.PI / 2, true); c.closePath(); c.fill();
+  };
+  seg(1, { x: 0, y: 0 }, shade(col, -0.35));
+  seg(0.72, { x: -0.18 * w0, y: -0.25 * w0 }, col);
+  if (lit) seg(0.3, { x: -0.42 * w0, y: -0.5 * w0 }, shade(col, 0.16));
+}
+function blob(c, pts, col) { c.fillStyle = col; c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); c.fill(); }
+
+// Blades: returns the tip in local coordinates.
+function drawBlade(c, hx, hy, ang, kind, s) {
+  const B = { sabre: { len: 37, w: 1.7, curve: 3.2, guard: "stirrup" }, rapier: { len: 41, w: 1.0, curve: 0, guard: "cup" }, cutlass: { len: 30, w: 2.6, curve: 4.2, guard: "shell" },
+    scimitar: { len: 33, w: 2.6, curve: 7.5, guard: "cross" } }[kind] || { len: 37, w: 1.7, curve: 3, guard: "stirrup" };
+  const ca = Math.cos(ang), sa = -Math.sin(ang), nx = -sa, ny = ca;   // blade direction (ca,sa); normal (nx,ny) is the edge's back
+  const tx = hx + ca * B.len, ty = hy + sa * B.len;
+  const mx = hx + ca * B.len * 0.55 + nx * B.curve, my = hy + sa * B.len * 0.55 + ny * B.curve;
+  // blade body: back edge and cutting edge
+  c.fillStyle = "#c9d0d8"; c.beginPath();
+  c.moveTo(hx + nx * B.w * 0.5, hy + ny * B.w * 0.5); c.quadraticCurveTo(mx + nx * B.w * 0.5, my + ny * B.w * 0.5, tx, ty);
+  c.quadraticCurveTo(mx - nx * B.w, my - ny * B.w, hx - nx * B.w * 0.7, hy - ny * B.w * 0.7); c.closePath(); c.fill();
+  c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = 0.55; c.beginPath(); c.moveTo(hx + ca * 4, hy + sa * 4); c.quadraticCurveTo(mx, my, tx, ty); c.stroke();
+  if (B.w > 1.2) { c.strokeStyle = "rgba(60,70,82,.55)"; c.lineWidth = 0.5; c.beginPath(); c.moveTo(hx + ca * 4 + nx * B.w * 0.15, hy + sa * 4 + ny * B.w * 0.15); c.quadraticCurveTo(mx + nx * B.w * 0.15, my + ny * B.w * 0.15, hx + ca * B.len * 0.8 + nx * B.curve * 0.7, hy + sa * B.len * 0.8 + ny * B.curve * 0.7); c.stroke(); }
+  // grip and pommel, behind the hand
+  c.strokeStyle = "#3a2414"; c.lineWidth = 2.2; c.lineCap = "round"; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx - ca * 6, hy - sa * 6); c.stroke();
+  c.fillStyle = "#c9a14a"; c.beginPath(); c.arc(hx - ca * 6.6, hy - sa * 6.6, 1.5, 0, TAU); c.fill();
+  // guard
+  c.strokeStyle = "#d8b45a"; c.fillStyle = "#b8913a"; c.lineWidth = 1.3;
+  if (B.guard === "cup") { c.beginPath(); c.ellipse(hx + ca * 1.5, hy + sa * 1.5, 1.6, 4.4, ang * -1 + Math.PI / 2 - Math.PI / 2, 0, TAU); c.fill(); c.beginPath(); c.moveTo(hx + nx * 4, hy + ny * 4); c.lineTo(hx - nx * 4, hy - ny * 4); c.stroke(); }
+  else if (B.guard === "stirrup") { c.beginPath(); c.moveTo(hx + ca * 1.2 - nx * 3, hy + sa * 1.2 - ny * 3); c.quadraticCurveTo(hx - ca * 3 - nx * 6, hy - sa * 3 - ny * 6, hx - ca * 6.6, hy - sa * 6.6); c.stroke();
+    c.beginPath(); c.moveTo(hx + ca * 1.2 + nx * 2.5, hy + sa * 1.2 + ny * 2.5); c.lineTo(hx + ca * 1.2 - nx * 3.2, hy + sa * 1.2 - ny * 3.2); c.stroke(); }
+  else if (B.guard === "shell") { c.beginPath(); c.moveTo(hx + ca * 1.5 + nx * 3, hy + sa * 1.5 + ny * 3); c.quadraticCurveTo(hx + ca * 0.5 - nx * 9, hy + sa * 0.5 - ny * 9, hx - ca * 6.6, hy - sa * 6.6); c.lineTo(hx - ca * 3, hy - sa * 3); c.closePath(); c.fill(); }
+  else { c.lineWidth = 1.8; c.beginPath(); c.moveTo(hx + ca * 1 + nx * 4.5, hy + sa * 1 + ny * 4.5); c.lineTo(hx + ca * 1 - nx * 4.5, hy + sa * 1 - ny * 4.5); c.stroke(); }
+  return { x: tx, y: ty };
+}
+
+function drawHead(c, hx, hy, tilt, L, P) {
+  c.save(); c.translate(hx, hy); c.rotate(tilt);
+  const sk = L.skin, dk = shade(sk, -0.3);
+  // hair at the back
+  c.fillStyle = L.hair; c.beginPath(); c.ellipse(-2.4, -1.6, 5.6, 6.4, -0.2, 0, TAU); c.fill();
+  // skull and face, in profile facing right
+  c.fillStyle = dk; c.beginPath(); c.ellipse(0, 0, 5.4, 6.6, 0, 0, TAU); c.fill();
+  c.fillStyle = sk; c.beginPath(); c.ellipse(0.5, -0.4, 4.9, 6.1, 0, 0, TAU); c.fill();
+  // jaw and chin
+  blob(c, [-1, 3, 4.6, 3.6, 5.2, 5.4, 3.6, 7.2, -0.6, 6.8], sk);
+  // brow, nose, lips
+  blob(c, [4.4, -2.4, 5.9, -1.6, 5.4, -1.0], dk);
+  blob(c, [5.0, -1.1, 7.6, 1.7, 5.1, 2.3], sk); blob(c, [5.1, 2.2, 7.5, 1.8, 5.2, 2.7], dk);
+  c.fillStyle = shade(sk, -0.45); c.fillRect(4.0, 4.0, 1.8, 0.7);
+  // eye: open, narrowed in effort or shut when falling
+  c.fillStyle = "#f2ece0"; c.beginPath(); c.ellipse(3.4, -0.7, 1.1, P.fall ? 0.2 : 0.7, 0, 0, TAU); c.fill();
+  if (!P.fall) { c.fillStyle = "#1a120b"; c.beginPath(); c.arc(3.9, -0.7, 0.55, 0, TAU); c.fill(); }
+  c.strokeStyle = "#2a1d12"; c.lineWidth = 0.6; c.beginPath(); c.moveTo(2.2, -1.9); c.lineTo(4.6, -2.0 + (P.effort ? 0.5 : 0)); c.stroke();
+  // ear
+  c.fillStyle = dk; c.beginPath(); c.ellipse(-0.8, 0.4, 1.2, 1.7, 0, 0, TAU); c.fill();
+  // whiskers
+  if (L.beard === "full") { blob(c, [-1.6, 1.6, 0.6, 2.4, 3.4, 3.4, 5.6, 4.6, 5.0, 7.0, 2.6, 8.4, -0.4, 7.4, -1.8, 4.4], L.hair); c.fillStyle = shade(sk, -0.45); c.fillRect(4.2, 4.2, 1.5, 0.6); }
+  else if (L.beard === "chops") { blob(c, [-1.4, 0.6, 0.6, 1.0, 1.6, 5.2, 0.2, 6.6, -1.2, 4.0], L.hair); blob(c, [4.4, 3.0, 6.4, 3.2, 6.0, 3.9, 4.4, 3.8], L.hair); }
+  else if (L.beard === "moustache") blob(c, [4.0, 3.0, 6.6, 3.1, 7.0, 4.2, 5.6, 3.7, 4.2, 3.9], L.hair);
+  // hats
+  const H = L.hatCol, Hd = shade(H, -0.35), Hl = shade(H, 0.28);
+  c.lineJoin = "round"; c.strokeStyle = shade(H, 0.32); c.lineWidth = 0.55;
+  const hb = (pts, col) => { blob(c, pts, col); c.stroke(); };
+  if (L.hat === "cap") { hb([-5.8, -3.0, -5.4, -8.2, 3.8, -8.8, 5.4, -4.2], H); hb([3.0, -4.4, 9.0, -3.6, 8.6, -2.8, 3.0, -3.1], Hd); c.fillStyle = L.trim; c.fillRect(-5.4, -4.6, 9.6, 1.1); c.fillStyle = Hl; c.fillRect(-4.6, -7.6, 7, 0.8); }
+  else if (L.hat === "tricorn") { hb([-10.5, -3.0, -6.0, -10.4, 1.0, -12.4, 7.0, -10.0, 11.4, -4.2, 5.0, -6.2, -3.0, -6.0], H); hb([-6.5, -6.6, -3.5, -10.4, 1.0, -11.2, 5.5, -9.4, 7.5, -6.8, 1, -7.4], Hl); c.strokeStyle = L.trim; c.lineWidth = 0.7; c.beginPath(); c.moveTo(-9.5, -3.6); c.quadraticCurveTo(0, -7.4, 10.4, -4.8); c.stroke(); }
+  else if (L.hat === "bowler") { c.fillStyle = H; c.beginPath(); c.ellipse(0, -5.2, 5.6, 5.0, 0, Math.PI, 0); c.fill(); c.stroke(); blob(c, [-7.4, -4.6, 7.4, -4.6, 7.0, -3.6, -7.0, -3.6], Hd); c.fillStyle = Hl; c.fillRect(-3.6, -9.2, 4, 0.7); }
+  else if (L.hat === "tall") { hb([-4.6, -4.2, -3.6, -17.0, 4.2, -17.4, 4.8, -4.2], H); c.fillStyle = "#6a4a8a"; c.fillRect(-4.4, -8.2, 9.2, 1.6); c.fillStyle = Hl; c.fillRect(-2.8, -16.4, 1.1, 11); }
+  else if (L.hat === "crest") { c.fillStyle = H; for (let i = -2; i <= 2; i++) blob(c, [i * 2.2 - 1.2, -5.0, i * 3.4 - 4.6, -15 + Math.abs(i) * 2.2, i * 2.2 + 1.2, -5.0], i % 2 ? Hd : H); }
+  else if (L.hat === "topper") { hb([-4.8, -4.2, -4.4, -15.0, 4.6, -15.0, 5.0, -4.2], H); hb([-7.6, -4.8, 7.8, -4.8, 7.6, -3.6, -7.4, -3.6], Hd); c.fillStyle = L.trim; c.fillRect(-4.7, -6.6, 9.6, 1.4); }
+  c.restore();
+}
+
+// Draw one fencer. P is the pose from duelPose(); f = +1 faces right, -1 faces left.
+function drawFencer2(c, x, gy, s, f, F, L, t, dim) {
+  L = lookDetail(L);
+  const P = duelPose(F, t);
+  P.effort = F.st === "wind" || F.st === "strike";
+  c.save(); c.translate(x, gy); c.scale(f * s, s);
+  // shadow on the deck
+  if (P.fall < 0.5) { c.fillStyle = `rgba(0,0,0,${0.32 - P.lift * 0.004})`; c.beginPath(); c.ellipse(4 + P.lunge * 10, 1, 26 + P.lunge * 8 - P.lift * 0.2, 4.2, 0, 0, TAU); c.fill(); }
+  // falling: tip over backwards around the back heel
+  if (P.fall) { const k = P.fall; c.translate(-16, 0); c.rotate(-k * 1.35); c.translate(16, 0); }
+  c.translate(0, -P.lift);
+  const lw = P.lean * 0.55, bob = Math.sin(t / 260) * 0.8;
+  // hips and feet
+  const crouch = P.crouch, tuck = P.tuck;
+  const hip = { x: -2 + P.lunge * 11, y: -(45 - crouch * 16) + bob };
+  const ff = { x: 15 + P.lunge * 24, y: -tuck * 18 }, bf = { x: -17 - P.lunge * 3, y: -tuck * 12 };
+  const fl = ik2(hip.x + 2, hip.y, ff.x, ff.y - 3, FIG.thigh, FIG.shin, 1), bl = ik2(hip.x - 2, hip.y, bf.x, bf.y - 3, FIG.thigh, FIG.shin, 1);
+  // torso: from hips to neck, leaning
+  const nk = { x: hip.x + Math.sin(lw) * FIG.torso, y: hip.y - Math.cos(lw) * FIG.torso };
+  const toW = (px, py) => ({ x: hip.x + px * Math.cos(lw) - py * Math.sin(lw), y: hip.y + px * Math.sin(lw) + py * Math.cos(lw) });
+  const shF = toW(-0.5, -26.5), shB = toW(-3.5, -26);
+  // the sword hand, from the pose's arm angle and reach
+  const reach = (FIG.upper + FIG.fore) * clamp(0.62 + 0.36 * P.reach, 0.35, 0.99);
+  const hand = { x: shF.x + Math.cos(P.arm) * reach, y: shF.y - Math.sin(P.arm) * reach };
+  const sa = ik2(shF.x, shF.y, hand.x, hand.y, FIG.upper, FIG.fore, 1);
+  // off hand: raised behind for balance, on the hip when taunting, flung out when stunned or falling
+  let oh;
+  if (P.hip) oh = { x: hip.x - 4, y: hip.y - 4 };
+  else if (F.st === "stun" || P.fall) oh = { x: shB.x - 9, y: shB.y + 27 };
+  else { // hanging at the side, swaying a little with the body, mostly hidden behind it
+    const sway = -Math.sin(lw) * 6 - P.lunge * 2 + Math.sin(t / 420) * 0.6;
+    oh = { x: shB.x + 1 + sway, y: shB.y + 30 - P.crouch * 3 }; }
+  const oa = ik2(shB.x, shB.y, oh.x, oh.y, FIG.upper, FIG.fore, P.hip ? 1 : -1);  // elbow back when hanging, out when on the hip
+  const coat = L.coat, coatD = shade(coat, -0.3), pants = L.pants, boot = L.boot;
+  // ---- far side: back arm and back leg ----
+  limb(c, shB.x, shB.y, oa.jx, oa.jy, 4.0, 3.4, coatD, false); limb(c, oa.jx, oa.jy, oa.ex, oa.ey, 3.4, 2.8, coatD, false);
+  c.fillStyle = shade(L.glove || L.skin, -0.3); c.beginPath(); c.arc(oa.ex, oa.ey, 2.4, 0, TAU); c.fill();
+  const leg = (l, foot, far) => {
+    const pc = far ? shade(pants, -0.28) : pants, bc2 = far ? shade(boot, -0.2) : boot;
+    limb(c, hip.x + (l === fl ? 2 : -2), hip.y, l.jx, l.jy, 5.6, 4.4, pc, !far);
+    // boot: from below the knee to the foot
+    const bx = mix(l.jx, l.ex, 0.12), by = mix(l.jy, l.ey, 0.12);
+    limb(c, l.jx, l.jy, bx, by, 4.4, 4.4, pc, false);
+    limb(c, bx, by, l.ex, l.ey, 4.6, 3.6, bc2, !far);
+    c.fillStyle = shade(bc2, 0.18); c.save(); c.translate(bx, by); c.rotate(Math.atan2(l.ey - l.jy, l.ex - l.jx) - Math.PI / 2); c.fillRect(-5, -1.6, 10, 2.6); c.restore();
+    // foot, flat on the deck unless tucked
+    const fa = tuck ? 0.5 : 0; c.save(); c.translate(l.ex, l.ey); c.rotate(fa);
+    blob(c, [-3.6, -2.2, 3.2, -2.6, 9.2, -0.6, 9.4, 3.0, -3.8, 3.0], bc2); c.fillStyle = "#0d0906"; c.fillRect(-3.8, 2.0, 13.2, 1.1); c.restore();
+  };
+  leg(bl, bf, true);
+  // ---- coat tails, swinging behind ----
+  const sw = clamp(-P.lean * 6 + P.lunge * 8 + (F.st === "strike" ? 4 : 0) + P.lift * 0.15, -4, 14);
+  blob(c, [hip.x - 6.5, hip.y - 3, hip.x + 1, hip.y - 1, hip.x - 4 - sw * 0.6, hip.y + 22 - crouch * 4, hip.x - 9 - sw, hip.y + 21 - crouch * 5 - sw * 0.3], coatD);
+  leg(fl, ff, false);
+  // ---- torso, drawn upright in its own frame and leaned ----
+  c.save(); c.translate(hip.x, hip.y); c.rotate(lw);
+  const tpath = () => { c.beginPath(); c.moveTo(-7, 3); c.quadraticCurveTo(-9.5, -12, -8, -24); c.quadraticCurveTo(-7, -30, -3, -31); c.lineTo(3.5, -31);
+    c.quadraticCurveTo(9.5, -27, 8.8, -19); c.quadraticCurveTo(8, -9, 7, 3); c.closePath(); };
+  c.fillStyle = coatD; tpath(); c.fill();
+  c.save(); tpath(); c.clip();
+  c.fillStyle = coat; c.beginPath(); c.ellipse(1.5, -16, 7.6, 17, 0, 0, TAU); c.fill();
+  c.fillStyle = shade(coat, 0.14); c.beginPath(); c.ellipse(4.5, -21, 3, 8, 0.2, 0, TAU); c.fill();
+  c.restore();
+  // front skirt of the coat below the belt
+  blob(c, [-6.5, 2, 7, 2, 6.2, 11 - crouch * 3, -1, 11 - crouch * 3], coatD);
+  // shirt and cravat at the open collar, lapel edge, buttons
+  blob(c, [0.6, -31, 4.4, -31, 5.6, -24, 3.2, -19, 1.6, -24], L.shirt);
+  blob(c, [1.6, -29.5, 4.2, -29.5, 3.0, -26.5], shade(L.shirt, -0.12));
+  c.strokeStyle = L.trim; c.lineWidth = 0.9; c.beginPath(); c.moveTo(4.6, -30.5); c.quadraticCurveTo(7.6, -24, 6.4, -2); c.stroke();
+  c.fillStyle = L.buttons; for (let k = 0; k < 4; k++) { c.beginPath(); c.arc(4.6, -18 + k * 4.6, 0.7, 0, TAU); c.fill(); }
+  // standing collar
+  blob(c, [-3.4, -34, 1.2, -33.6, 1.6, -30.6, -3.4, -30.4], coat); c.fillStyle = L.trim; c.fillRect(-3.4, -34.4, 4.8, 0.9);
+  // belt or sash
+  blob(c, [-7.2, -1.2, 7.2, -1.2, 7.1, 1.8, -7.1, 1.8], L.sash || L.belt);
+  if (L.sash) blob(c, [-6, 1, -3, 1, -5, 9, -7.5, 8], L.sash); else { c.fillStyle = "#c9a14a"; c.fillRect(2.6, -1, 2.6, 2.6); }
+  if (L.epaulette) { c.fillStyle = L.trim; c.beginPath(); c.ellipse(-0.6, -29.2, 5, 1.8, 0, 0, TAU); c.fill(); c.fillStyle = shade(L.trim, -0.25); for (let k = -3; k <= 3; k += 1.5) c.fillRect(-0.6 + k, -28, 0.6, 2.4); }
+  c.restore();
+  // ---- head ----
+  const tilt = lw * 0.5 + (F.st === "stun" ? -0.35 : 0) + (P.crouch > 0.5 ? 0.2 : 0);
+  const hd = toW(0.6, -40);
+  c.save(); c.translate(hd.x, hd.y); c.scale(1.3, 1.3); drawHead(c, 0, 0, tilt, L, P); c.restore();
+  // ---- sword arm and blade ----
+  limb(c, shF.x, shF.y, sa.jx, sa.jy, 4.4, 3.6, coat, true);
+  limb(c, sa.jx, sa.jy, sa.ex, sa.ey, 3.6, 3.0, coat, true);
+  { const ca = Math.atan2(sa.ey - sa.jy, sa.ex - sa.jx); limb(c, sa.ex - Math.cos(ca) * 5.5, sa.ey - Math.sin(ca) * 5.5, sa.ex - Math.cos(ca) * 3.2, sa.ey - Math.sin(ca) * 3.2, 3.4, 3.4, L.trim, false); }
+  c.fillStyle = L.shirt; c.beginPath(); c.arc(sa.ex - Math.cos(Math.atan2(sa.ey - sa.jy, sa.ex - sa.jx)) * 1.6, sa.ey - Math.sin(Math.atan2(sa.ey - sa.jy, sa.ex - sa.jx)) * 1.6, 2.7, 0, TAU); c.fill();
+  // blade (drawn before the fist so the fingers wrap the grip)
+  const tip = drawBlade(c, sa.ex, sa.ey, P.sword, L.blade, s);
+  c.fillStyle = L.glove || L.skin; c.beginPath(); c.arc(sa.ex, sa.ey, 2.4, 0, TAU); c.fill();
+  c.fillStyle = shade(L.glove || L.skin, -0.3); c.beginPath(); c.arc(sa.ex + 0.5, sa.ey + 0.8, 1.3, 0, TAU); c.fill();
+  // motion smear on a strike
+  if (F.st === "strike" && F.trail && F.trail.length > 1) {
+    c.save(); c.globalCompositeOperation = "lighter";
+    for (let i = 1; i < F.trail.length; i++) { const a = F.trail[i - 1], b = F.trail[i]; c.fillStyle = `rgba(220,230,240,${0.08 + i * 0.05})`; c.beginPath(); c.moveTo(sa.ex, sa.ey); c.lineTo(a.x, a.y); c.lineTo(b.x, b.y); c.closePath(); c.fill(); }
+    c.restore();
+  }
+  if (dim) { c.globalCompositeOperation = "source-atop"; c.fillStyle = dim; c.fillRect(-60, -140, 140, 160); c.globalCompositeOperation = "source-over"; }
+  c.restore();
+  // remember where the tip was, for the smear (local coords)
+  if (F.st === "strike") { F.trail = F.trail || []; F.trail.push({ x: tip.x, y: tip.y }); if (F.trail.length > 5) F.trail.shift(); } else F.trail = null;
+  return { tx: x + f * tip.x * s, ty: gy + (tip.y - P.lift) * s };
 }
 
 // ===================== BACKUPS AND UPDATES (0.27) =====================
@@ -2474,6 +2657,13 @@ function confirmCloud(back) {
 // ===================== TITLE, PAUSE MENU, MANUAL, CHANGELOG, ABOUT (0.26) =====================
 // Spoiler-free changelog, newest first.
 const CHANGELOG = [
+  { v: "0.32", items: [
+    "Landings. Sail to a world and choose Land (or tap the world on the chart). Each world has sites to survey, and the learned societies on Earth pay for your reports.",
+    "Dig ore, quicksilver, coal, amber and apergy yourself, and collect natural specimens for the museums. Airless worlds need pressure suits, sold at the great Earth yards and at Ceres.",
+    "Expeditions. Send a landing party into ruins and wild country, stage by stage. Choose who goes and how much water or air to carry, then decide at each step whether to push deeper or turn back.",
+    "Outposts and coaling stations. With a colonial charter from a friendly governor, build stations on the Moon and the asteroids. They produce cargo, store yours, and sell their surplus, but raiders call at undefended ones.",
+    "Two new asteroids to explore in the Phaeton belt, and three new cargoes found only ashore: metal ore, natural specimens and ancient relics.",
+    "Boarding duels redrawn: jointed, shaded fencers with a look and a sword for each kind of captain, and crews that really trade blows behind you." ] },
   { v: "0.31", items: [
     "Boarding duels. When the hulls touch you may lead the boarders yourself and cross swords with the enemy captain while the crews fight behind you.",
     "Three attacks, each answered by its own defence, and a choice of sabre, rapier or cutlass. Drive the enemy captain to the far end of the deck to take the ship.",
@@ -2640,6 +2830,38 @@ const MANUAL = [
     <p>Meanwhile the crews fight behind you. The bar at the top shows who is winning; the side with the upper hand lends its captain speed. A <b>taunt</b> heartens your crew, but leaves you open. The sabre is balanced, the rapier quicker with a shorter guard, the cutlass slower but harder-hitting.</p>
     <h3>Prizes</h3>
     <p>A captured ship gives up her gold, some of her crew and her cargo. You can add her to your fleet or make her your flagship. If you lose your flagship, your best remaining ship takes over; with no fleet, you'll be put ashore poorer but alive.</p>` },
+  { t: "Landings", h: `
+    <p>Every world can be landed on. Sail close and choose <b>Land</b> from the list at the bottom of the chart, or tap the world itself. Days pass while you are ashore, and the crew still eats.</p>
+    <h3>Sites and surveys</h3>
+    <p>Each world has one to three <b>sites</b>. A site must be <b>surveyed</b> (two days) before you can use it. Every survey also earns a report, and the learned societies pay for reports when you next make port on Earth.</p>
+    <p>The Moon, the asteroids and Mercury's night side have no air. To set foot there you need <b>pressure suits</b>, sold once and for all at the shipwrights of the Earth capitals and at Ceres Haven.</p>
+    <h3>Digging and collecting</h3>
+    <ul>
+      <li><b>Dig</b> where there is ore, coal, quicksilver, amber or apergy. A bigger crew and a good engineer dig more in a day. The easy diggings run out.</li>
+      <li><b>Collect specimens</b> where there is wildlife. The museums of Earth pay well for them, and now and then a collector doesn't come back.</li>
+    </ul>
+    <p><b>Metal ore</b>, <b>natural specimens</b> and <b>ancient relics</b> can't be bought anywhere. Earth pays best for all three.</p>
+    <h3>Expeditions</h3>
+    <p>Ruins and wild country are explored by a <b>landing party</b>. Choose how many hands go, how many days of water (or air) they carry, and which officers lead them. Supplies come out of your provisions.</p>
+    <p>The party advances one <b>stage</b> at a time, and each stage uses a day's supplies. At every stage something happens, and you choose what to do about it. Then you choose again: <b>push deeper</b> or <b>turn back</b>. The way home needs about half as many days as the way in. Run short and people die on the march out.</p>
+    <table class="t"><thead><tr><th>Officer ashore</th><th>What they do</th></tr></thead><tbody>
+      <tr><td><b>Navigator</b></td><td>Finds safer paths and a shorter way home</td></tr>
+      <tr><td><b>Surgeon</b></td><td>Keeps the hurt alive</td></tr>
+      <tr><td><b>Chief engineer</b></td><td>Deals with bad ground and stuck doors</td></tr>
+      <tr><td><b>Marine captain</b></td><td>Leads the fighting</td></tr>
+      <tr><td><b>Lens-singer</b></td><td>Reads the old writing and finds more in ruins</td></tr>
+      <tr><td><b>Quartermaster</b></td><td>Packs out a bigger haul</td></tr>
+      <tr><td><b>Factor</b></td><td>Gets better terms from the peoples you meet</td></tr>
+    </tbody></table>
+    <p class="note">Officers who go ashore can be wounded. What you find at the deepest stage can only be taken once, but you can come back and go further another day.</p>
+    <h3>Outposts and coaling stations</h3>
+    <p>On the Moon and the asteroids there is good ground to build on. First you need a <b>colonial charter</b>, sold by any great-power governor who thinks well of you. Then bring gold and <b>machinery</b> in your hold.</p>
+    <ul>
+      <li>A <b>coaling station</b> wins rock-coal from the ground, so you can fill your bunkers for nothing far from any port.</li>
+      <li>A <b>mining outpost</b> works whatever the site holds: ore, quicksilver or apergy.</li>
+    </ul>
+    <p>Both pile up cargo for you to load, keep a <b>warehouse</b> for your own goods, and can be enlarged twice. When the bunkers are full, the surplus is sold to passing ships at half price and the takings wait for you.</p>
+    <p>Pirates, and your charter's enemies in wartime, <b>raid</b> lonely stations. Leave hands as a <b>garrison</b> and build a <b>palisade and gun</b>. A beaten station loses its stores, and now and then is burned and must be rebuilt. The <b>Holdings</b> button on the chart lists your stations as last reported.</p>` },
   { t: "Nations", h: `
     <p>Britain, Germany, France and Russia each hold colonies on Mars and Venus, and the Martian city-states rule the rest. Wars start and end as months pass; the public houses and governors carry the news.</p>
     <p>Attack a nation's ships and it turns against you. Attack its enemies and it warms to you. Pirates are fair game for everyone.</p>
@@ -2667,7 +2889,7 @@ const MANUAL = [
       <tr><td></td><td>Arrow keys, A or D</td><td>Steer by hand</td></tr>
       <tr><td></td><td>B</td><td>Stoke or bank the boilers</td></tr>
       <tr><td></td><td>Space</td><td>Heave to</td></tr>
-      <tr><td></td><td>1 to 9</td><td>Pick from the numbered list of nearby ports and ships</td></tr>
+      <tr><td></td><td>1 to 9</td><td>Pick from the numbered list of nearby ports, ships and landing places</td></tr>
       <tr><td></td><td>Enter</td><td>The first entry in that list</td></tr>
       <tr><td></td><td>+ and −, or mouse wheel</td><td>Zoom</td></tr>
       <tr><td>Approaching a ship</td><td>Z</td><td>Attack</td></tr>
@@ -2680,6 +2902,9 @@ const MANUAL = [
       <tr><td></td><td>C or /</td><td>Fire canister</td></tr>
       <tr><td></td><td>B</td><td>Stoke or bank the boilers</td></tr>
       <tr><td></td><td>P or Esc</td><td>Pause</td></tr>
+      <tr><td>Expedition</td><td>1 to 9</td><td>Choose what to do</td></tr>
+      <tr><td></td><td>Z or Enter</td><td>Push deeper</td></tr>
+      <tr><td></td><td>X</td><td>Turn back</td></tr>
       <tr><td>Boarding duel</td><td>Z or ,</td><td>Chop: slow, drives the enemy back furthest</td></tr>
       <tr><td></td><td>X or .</td><td>Thrust: quick, a short step back</td></tr>
       <tr><td></td><td>C or /</td><td>Slash: between the two</td></tr>
@@ -2795,6 +3020,589 @@ function resumeFromMenu() {
   gamePaused = false; const from = menuFrom; menuFrom = null; last = performance.now();
   if (from === "port" && G.docked) openPort(G.docked);
   else closePanel();
+}
+
+// ===================== LANDINGS, EXPEDITIONS, OUTPOSTS (0.32) =====================
+// Land on a world to survey its sites, dig and collect, send expeditions into ruins and wild
+// places, and (with a charter) build coaling stations and mining outposts on moons and asteroids.
+
+// Things you find rather than buy. Earth pays well for all three.
+GOODS.ore = { n: "Metal ore", b: 22, found: true };
+GOODS.specimens = { n: "Natural specimens", b: 90, found: true };
+GOODS.relics = { n: "Ancient relics", b: 210, found: true };
+EARTH_WANT.push("ore", "specimens", "relics");
+PORT.thothka.want.push("relics"); PORT.ceres.want.push("ore");
+
+// Two unclaimed rocks in the Phaeton belt.
+MINOR.vesta = { parent: null, r: 632 * WORLD, period: 1325, a0: 0.4, size: 4 * WORLD, col: "#b3a48e", name: "Vesta" };
+MINOR.juno = { parent: null, r: 688 * WORLD, period: 1592, a0: 3.3, size: 3 * WORLD, col: "#8f8676", name: "Juno" };
+
+// terrain: desert, canal, swamp, highland, crater, rock, twilight, night.  suits: needs pressure suits.
+// ore: what can be dug (rich = tons a full crew digs per day).  fauna: specimens to collect.
+// exp: { kind: "ruin" | "wild", depth }.  build: an outpost may stand here.  risk: how often raiders call.
+const SITES = [
+  { id: "merc_twilight", body: "mercury", name: "The Twilight Belt", terrain: "twilight", ore: "quicksilver", rich: 5, exp: { kind: "wild", depth: 4 }, blurb: "A ribbon of dusk between the furnace and the ice, where crystal gardens grow." },
+  { id: "merc_night", body: "mercury", name: "The Night Side", terrain: "night", suits: true, exp: { kind: "ruin", depth: 5 }, blurb: "Black ice that has never seen the Sun. Something regular shows under it." },
+  { id: "ven_coast", body: "venus", name: "The Fever Coast", terrain: "swamp", ore: "amber", rich: 5, fauna: true, exp: { kind: "wild", depth: 4 }, blurb: "Steaming mangrove and amber-bearing mud. Everything here bites." },
+  { id: "ven_high", body: "venus", name: "The Cloud Highlands", terrain: "highland", fauna: true, exp: { kind: "wild", depth: 3 }, blurb: "Stone spires above the cloud sea, loud with wings." },
+  { id: "ven_zig", body: "venus", name: "The Drowned Ziggurat", terrain: "swamp", exp: { kind: "ruin", depth: 6 }, blurb: "Seven terraces of green stone, sinking a little further every year." },
+  { id: "moon_imbrium", body: "moon", name: "Mare Imbrium", terrain: "crater", suits: true, ore: "ore", rich: 10, build: true, risk: 0.6, blurb: "A grey plain of old lava under a black sky, with the Earth hanging overhead." },
+  { id: "moon_tycho", body: "moon", name: "Tycho's Rays", terrain: "crater", suits: true, exp: { kind: "ruin", depth: 4 }, blurb: "Bright streaks run for miles from the crater. At the centre, a shaft goes down." },
+  { id: "mars_wastes", body: "mars", name: "The Ochre Wastes", terrain: "desert", ore: "apergy", rich: 1.5, fauna: true, exp: { kind: "wild", depth: 4 }, blurb: "Red dunes and wind-cut buttes. Skarr country, and thin veins of apergy." },
+  { id: "mars_canal", body: "mars", name: "The Dead Canal of Ka-Resh", terrain: "canal", exp: { kind: "ruin", depth: 6 }, blurb: "A dry canal ruled straight to the horizon, lined with cities nobody remembers." },
+  { id: "deimos_ravine", body: "deimos", name: "The Deimos Ravines", terrain: "rock", suits: true, ore: "ore", rich: 8, build: true, risk: 1.6, sky: "mars", blurb: "Deep clefts of dark rock, a short pull from the pirate roads." },
+  { id: "ceres_fields", body: "ceres", name: "The Ceres Coal Fields", terrain: "rock", suits: true, ore: "coal", rich: 12, build: true, risk: 0.9, blurb: "Seams of black rock-coal, the stuff the Vorrn burn." },
+  { id: "pallas_cliffs", body: "pallas", name: "The Pallas Cliffs", terrain: "rock", suits: true, ore: "quicksilver", rich: 4, build: true, risk: 1.7, blurb: "Sheer faces streaked with cinnabar. Krillian salvagers watch every landing." },
+  { id: "vesta_plain", body: "vesta", name: "The Iron Plain", terrain: "rock", suits: true, ore: "ore", rich: 14, build: true, risk: 1, blurb: "Nickel-iron lying loose on the surface, and not a claim stake in sight." },
+  { id: "vesta_vault", body: "vesta", name: "The Vesta Vault", terrain: "rock", suits: true, exp: { kind: "ruin", depth: 5 }, blurb: "A doorway cut square into the rock, far too old to be Vorrn work." },
+  { id: "juno_vein", body: "juno", name: "The Juno Vein", terrain: "rock", suits: true, ore: "apergy", rich: 2, build: true, risk: 1.2, blurb: "A seam of apergy crystal as thick as a man's arm." }
+];
+const SITE = Object.fromEntries(SITES.map(s => [s.id, s]));
+const sitesOf = body => SITES.filter(s => s.body === body);
+const LAND_BODIES = [...new Set(SITES.map(s => s.body))];
+const bodyName = id => (PLANETS.find(p => p.id === id) || MINOR[id]).name;
+const LAND = { suitsCost: 350, charterCost: 800, reportPay: 80, maxOutposts: 6, storeCap: 120,
+  build: { coal: { n: "Coaling station", gold: 1000, mach: 10 }, mine: { n: "Mining outpost", gold: 1500, mach: 15 } },
+  rate: { coal: 1, ore: 0.8, quicksilver: 0.35, apergy: 0.2, amber: 0.4 }, capDays: 70, wallCost: 600, lvlCost: 800 };
+
+function ensureLand() {
+  if (!G) return;
+  G.sites = G.sites || {}; if (G.suits == null) G.suits = false; if (G.charter === undefined) G.charter = null;
+  if (G.reports == null) G.reports = 0; if (G.fragments == null) G.fragments = 0; G.landed = null;
+  if (G.prices) for (const p of PORTS) for (const g in GOODS) if (G.prices[p.id] && G.prices[p.id][g] == null) G.prices[p.id][g] = targetPrice(p.id, g);
+}
+function siteState(id) { const s = SITE[id]; return G.sites[id] || (G.sites[id] = { surveyed: false, ore: s.ore ? Math.round(s.rich * 30) : 0, fauna: s.fauna ? 8 : 0, deepest: 0, done: false }); }
+const outposts = () => !G || !G.sites ? [] : SITES.filter(s => G.sites[s.id] && G.sites[s.id].outpost).map(s => ({ site: s, o: G.sites[s.id].outpost }));
+let landAbort = false;
+// Days pass while you are ashore: the crew eats, prices drift, the world moves on.
+function passDays(n) { landAbort = false; for (let i = 0; i < n && !landAbort; i++) { G.day += 1; dayTick(); } return !landAbort; }
+
+// ---------- outposts: daily production and raids ----------
+function outpostProduct(site, o) { return o.kind === "coal" ? "coal" : site.ore; }
+function outpostRate(site, o) { return (LAND.rate[outpostProduct(site, o)] || 0.5) * (1 + 0.5 * (o.lvl - 1)); }
+function outpostCap(site, o) { return Math.round(outpostRate(site, o) * LAND.capDays); }
+function outpostsDaily() {
+  for (const { site, o } of outposts()) {
+    if (o.ruined) continue;
+    // what the bunkers can't hold is sold to passing ships at half price, and the money waits for you
+    const made = outpostRate(site, o), room = outpostCap(site, o) - o.stock, over = Math.max(0, made - room);
+    o.stock += made - over; if (over > 0) o.till = (o.till || 0) + over * GOODS[outpostProduct(site, o)].b * 0.5;
+    if (G.day - o.built > 60 && Math.random() < (site.risk || 1) / 110) {   // raiders take a couple of months to hear of a new station
+      const atWarNow = G.charter && enemiesOf(G.charter).length > 0;
+      const who = atWarNow && Math.random() < 0.4 ? `${NATIONS[pickOne(enemiesOf(G.charter))].adj} raiders` : site.risk > 1.4 ? "Pirates from the havens" : "Belt pirates";
+      const str = rnd(5, 20) * (site.risk || 1), def = o.garrison * 1.2 + (o.wall ? 12 : 0);
+      if (def >= str) { o.raids = (o.raids || 0) + 1; logMsg(`${who} attacked ${o.name} and were driven off.`); toast(`News by heliograph: ${who.toLowerCase()} attacked ${o.name}. The garrison drove them off!`, 4500); G.fame += 1; }
+      else {
+        const frac = rnd(0.5, 1), lostMen = Math.min(o.garrison, Math.round(o.garrison * rnd(0.2, 0.5)));
+        o.stock *= 1 - frac; o.till = Math.floor((o.till || 0) * (1 - frac)); for (const g in o.store) { o.store[g] = Math.floor(o.store[g] * (1 - frac)); if (o.store[g] <= 0) delete o.store[g]; }
+        o.garrison -= lostMen;
+        if (def < str * 0.5 && Math.random() < 0.2) { o.ruined = true; logMsg(`${who} sacked and burned ${o.name}.`); toast(`News by heliograph: ${who.toLowerCase()} have burned ${o.name}. It will have to be rebuilt.`, 5200); }
+        else { logMsg(`${who} raided ${o.name} and carried off its stores.`); toast(`News by heliograph: ${who.toLowerCase()} have raided ${o.name} and carried off ${frac > 0.9 ? "everything" : "much of its stores"}.`, 5000); }
+      }
+    }
+  }
+}
+// The learned societies pay for survey reports when you next reach an Earth port.
+function landAtPort(p) {
+  if (p.body === "earth" && G.reports > 0) { const pay = G.reports * LAND.reportPay; G.gold += pay; G.fame += G.reports;
+    logMsg(`The learned societies paid ${fmtGold(pay)} for ${G.reports} survey report${G.reports > 1 ? "s" : ""}.`); toast(`The learned societies pay ${fmtGold(pay)} for your survey reports.`, 4200); G.reports = 0; }
+}
+
+// ---------- the landing screen ----------
+function canLand(body) { return sitesOf(body).length > 0; }
+function landingPoint(body) { const b = bodyPos(body, G.day), s = G.ship, a = Math.atan2(s.y - b.y, s.x - b.x), r = bodySize(body) + 9; return { x: b.x + Math.cos(a) * r, y: b.y + Math.sin(a) * r }; }
+function openLanding(body, note) {
+  if (mode === "map") { const lp = landingPoint(body); G.ship.x = lp.x; G.ship.y = lp.y; G.target = null; G.boilers = false; $("btnBoil").classList.remove("on"); logMsg(`Landed on ${bodyName(body)}.`); }
+  mode = "panel"; G.landed = body;
+  const cards = sitesOf(body).map(s => siteCard(s)).join("");
+  showPanel(`<header><div><h2 id="pTitle">${esc(bodyName(body))}</h2><div class="tag">${G.suits ? "Pressure suits aboard" : "No pressure suits aboard"} · ${G.ship.crew} hands · provisions ${Math.floor(has("provisions"))}</div></div>
+      <div class="tag num">${dateStr(G.day)} · ${fmtGold(G.gold)} · hold ${Math.floor(cargoUsed())}/${shipDef().cargo}</div></header>
+    <div class="body">${note ? `<p class="note" style="margin-top:0;color:var(--brass-hi)">${note}</p>` : ""}<div class="grid2 sites">${cards}</div></div>
+    <footer>${outposts().length ? `<button class="b" id="ldHold">Holdings</button>` : ""}<button class="b" id="ldOff">Officers</button><button class="b" id="ldLog">Log</button><button class="b main" id="ldUp" autofocus><span class="key">Esc</span>Return to the aether</button></footer>`,
+    e => { if (e.key === "Escape") liftOff(); });
+  panel.querySelectorAll("canvas.scene").forEach(cv => { const s = SITE[cv.dataset.site], st = siteState(s.id); drawLandScene(cv, s, { camp: true, outpost: st.outpost, hide: !st.surveyed }); });
+  $("ldUp").onclick = liftOff; $("ldOff").onclick = () => officersScreen(() => openLanding(body)); $("ldLog").onclick = () => logScreen(() => openLanding(body));
+  if ($("ldHold")) $("ldHold").onclick = () => holdingsScreen(() => openLanding(body));
+  panel.querySelector(".sites").onclick = e => { const b = e.target.closest("button[data-act]"); if (b) siteAct(SITE[b.dataset.site], b.dataset.act); };
+}
+function liftOff() {
+  const body = G.landed; G.landed = null; closePanel();
+  const b = bodyPos(body, G.day), a = Math.atan2(b.y, b.x), r = bodySize(body) + 16;
+  G.ship.x = b.x + Math.cos(a) * r; G.ship.y = b.y + Math.sin(a) * r; G.ship.h = a;
+  paused = false; $("btnPause").classList.remove("on"); save(); resumeMap(); toast("Lifted off. Tap the chart to set a course.", 2200);
+}
+function siteCard(s) {
+  const st = siteState(s.id), need = s.suits && !G.suits, o = st.outpost;
+  const tags = [s.suits ? "Airless: pressure suits needed" : "Breathable air"];
+  let info = "", acts = "";
+  const btn = (act, label, main, off, why) => `<button class="b sm${main ? " main" : ""}" data-site="${s.id}" data-act="${act}"${off ? ` disabled title="${esc(why || "")}"` : ""}>${label}</button>`;
+  if (need) info = `<p class="note">You can't set foot here without pressure suits. The outfitters at the great Earth ports and at Ceres sell them.</p>`;
+  else if (!st.surveyed) { info = `<p class="note">Unsurveyed. Two days' work will tell you what is here.</p>`; acts = btn("survey", "Survey the site · 2 days", true); }
+  else {
+    const lines = [];
+    if (s.ore) lines.push(st.ore >= 1 ? `<b>${GOODS[s.ore].n}</b>: about ${Math.floor(st.ore)} tons within easy reach` : `<b>${GOODS[s.ore].n}</b>: the easy diggings are worked out for now`);
+    if (s.fauna) lines.push(st.fauna >= 1 ? "<b>Wildlife</b>: specimens to be had" : "<b>Wildlife</b>: scared off for the present");
+    if (s.exp) lines.push(s.exp.kind === "ruin" ? `<b>Ruins</b>: ${st.done ? "explored to the end" : st.deepest ? `explored to depth ${st.deepest} of ${s.exp.depth}` : "unexplored"}` : `<b>Wild country</b>: ${st.done ? "crossed from end to end" : st.deepest ? `explored to stage ${st.deepest} of ${s.exp.depth}` : "unexplored"}`);
+    if (s.build && !o) lines.push("<b>Good ground</b> for an outpost");
+    info = `<ul class="facts">${lines.map(l => `<li>${l}</li>`).join("")}</ul>`;
+    if (s.ore && st.ore >= 1 && !o) acts += btn("dig", `Dig ${GOODS[s.ore].n.toLowerCase()} · 1 day`, false, cargoFree() < 1, "The hold is full");
+    if (s.fauna && st.fauna >= 1) acts += btn("hunt", "Collect specimens · 1 day", false, cargoFree() < 1, "The hold is full");
+    if (s.exp) acts += btn("exp", s.exp.kind === "ruin" ? "Explore the ruins" : "Mount an expedition", true);
+    if (s.build && !o) acts += btn("build", "Build here", false);
+    if (o) { info += outpostInfo(s, o); acts += o.ruined ? btn("rebuild", `Rebuild · ${fmtGold(LAND.build[o.kind].gold / 2)}`, true, G.gold < LAND.build[o.kind].gold / 2, "You can't afford it") : btn("post", `Visit ${esc(o.name)}`, true); }
+  }
+  return `<div class="card site"><canvas class="scene" data-site="${s.id}" aria-label="${esc(s.name)}"></canvas><h3>${esc(s.name)}</h3><p class="note" style="margin:0 0 6px">${esc(s.blurb)}</p>
+    <p class="note" style="margin:0 0 6px;color:${need ? "var(--bad)" : "var(--fg-2)"}">${tags.join(" · ")}</p>${info}<div class="row" style="gap:6px;margin-top:8px">${acts}</div></div>`;
+}
+function outpostInfo(s, o) {
+  if (o.ruined) return `<p class="note" style="color:var(--bad)">${esc(o.name)} lies burned and looted.</p>`;
+  return `<p class="note"><b>${esc(o.name)}</b>: ${Math.floor(o.stock)} tons of ${GOODS[outpostProduct(s, o)].n.toLowerCase()} ready${(o.till || 0) >= 1 ? ` · ${fmtGold(Math.floor(o.till))} takings` : ""} · garrison ${o.garrison}</p>`;
+}
+function siteAct(s, act) {
+  const st = siteState(s.id), body = s.body, back = note => openLanding(body, note);
+  if (act === "survey") { if (!passDays(2)) return; st.surveyed = true; G.reports++; G.fame += 2; logMsg(`Surveyed ${s.name} on ${bodyName(body)}.`);
+    back(`Your survey of ${s.name} is complete. The learned societies on Earth will pay for the report.`); }
+  else if (act === "dig") {
+    const n = Math.floor(Math.min(st.ore, cargoFree(), Math.max(1, s.rich * Math.min(1, G.ship.crew / 30) * (1 + 0.5 * eff("eng")))));
+    if (n < 1) return toast("The hold is full.");
+    if (!passDays(1)) return; st.ore -= n; addCargo(s.ore, n); G.ship.morale = clamp(G.ship.morale - 1, 0, 100);
+    back(`A day with pick and shovel puts ${n} ton${n > 1 ? "s" : ""} of ${GOODS[s.ore].n.toLowerCase()} in the hold.`); }
+  else if (act === "hunt") {
+    if (!passDays(1)) return; const n = Math.min(Math.floor(st.fauna), ri(1, 3), Math.floor(cargoFree())); st.fauna -= n; addCargo("specimens", n);
+    let extra = ""; if (Math.random() < 0.25 * (1 - 0.6 * eff("surgeon")) && G.ship.crew > 5) { G.ship.crew--; extra = " One of the collectors didn't come back."; }
+    back(`Your naturalists bring back ${n} crate${n > 1 ? "s" : ""} of specimens.${extra}`); }
+  else if (act === "exp") expeditionSetup(s);
+  else if (act === "build") buildScreen(s);
+  else if (act === "post") outpostScreen(s);
+  else if (act === "rebuild") { const o = st.outpost, c = LAND.build[o.kind].gold / 2; if (G.gold < c) return; G.gold -= c; o.ruined = false; o.stock = 0; logMsg(`Rebuilt ${o.name}.`); back(`${o.name} is rebuilt and working again.`); }
+}
+
+// ---------- building and running outposts ----------
+function buildScreen(s) {
+  const back = () => openLanding(s.body), n = outposts().length;
+  let body;
+  if (!G.charter) body = `<div class="prose"><p>You can't simply plant a flag. A colonial charter from a governor makes your claim lawful, and gives the navy a reason to care if it's burned.</p><p class="note">Any governor of a great power who thinks well of you will sell a charter.</p></div>`;
+  else if (n >= LAND.maxOutposts) body = `<div class="prose"><p>Your charter allows ${LAND.maxOutposts} establishments, and you have them all.</p></div>`;
+  else {
+    const opt = k => { const b = LAND.build[k], ok = G.gold >= b.gold && has("machinery") >= b.mach, prod = k === "coal" ? "coal" : s.ore;
+      return `<div class="card"><h3>${b.n}</h3><p class="note">${k === "coal" ? "Retorts and bunkers that win rock-coal from the ground. Fill your bunkers here for nothing." : `Shafts and a crusher that work the ${GOODS[s.ore].n.toLowerCase()} all year round.`}
+        Makes about ${(LAND.rate[prod] * 30).toFixed(0)} tons of ${GOODS[prod].n.toLowerCase()} a month, and stores up to ${LAND.storeCap} tons of your own cargo.</p>
+        <p class="note">Costs ${fmtGold(b.gold)} and ${b.mach} tons of machinery from your hold (you have ${Math.floor(has("machinery"))}).</p>
+        <button class="b sm main" data-k="${k}"${ok ? "" : " disabled"}>Build the ${b.n.toLowerCase()}</button></div>`; };
+    body = `<p class="note" style="margin-top:0">Chartered by the ${NATIONS[G.charter].name}. ${n} of ${LAND.maxOutposts} establishments built.</p><div class="grid2">${opt("coal")}${s.ore && s.ore !== "coal" ? opt("mine") : ""}</div>
+      <p class="note">Raiders call at lonely stations. Leave a garrison, and build a palisade when you can.</p>`;
+  }
+  showPanel(`<header><div><h2 id="pTitle">Build at ${esc(s.name)}</h2><div class="tag">${esc(bodyName(s.body))}</div></div><div class="tag num">${fmtGold(G.gold)}</div></header><div class="body">${body}</div>
+    <footer><button class="b main" id="bsBack" autofocus>Back</button></footer>`, e => { if (e.key === "Escape") back(); });
+  $("bsBack").onclick = back;
+  panel.querySelectorAll("[data-k]").forEach(b => b.onclick = () => { const k = b.dataset.k, c = LAND.build[k]; if (G.gold < c.gold || has("machinery") < c.mach) return;
+    if (!passDays(3)) return; G.gold -= c.gold; addCargo("machinery", -c.mach);
+    const name = (k === "coal" ? pickOne(["Port", "Fort", "Camp"]) : pickOne(["Mount", "New", "Fort"])) + " " + G.captain.split(" ").slice(-1)[0];
+    const used = outposts().map(x => x.o.name), nm = used.includes(name) ? `${bodyName(s.body)} ${k === "coal" ? "Coaling Station" : "Works"}` : name;
+    siteState(s.id).outpost = { kind: k, name: nm, lvl: 1, stock: 0, store: {}, garrison: 0, wall: false, built: Math.floor(G.day), ruined: false };
+    G.fame += 4; logMsg(`Founded ${nm}, a ${c.n.toLowerCase()} at ${s.name}.`); outpostScreen(s, `${nm} is founded. Three days' work, and the flag is up.`); });
+}
+function outpostScreen(s, note) {
+  const st = siteState(s.id), o = st.outpost, back = () => openLanding(s.body), prod = outpostProduct(s, o), stored = Object.values(o.store).reduce((a, b) => a + b, 0);
+  const goods = [...new Set([...Object.keys(G.cargo), ...Object.keys(o.store)])].filter(g => (G.cargo[g] || 0) >= 1 || (o.store[g] || 0) >= 1);
+  const rows = goods.map(g => `<tr><td>${GOODS[g].n}</td><td class="r num">${Math.floor(has(g))}</td><td class="r num">${Math.floor(o.store[g] || 0)}</td><td class="r"><div class="row" style="justify-content:flex-end;gap:4px">
+    <button class="b sm" data-put="${g}"${has(g) >= 1 && stored < LAND.storeCap ? "" : " disabled"}>Store</button><button class="b sm" data-take="${g}"${(o.store[g] || 0) >= 1 && cargoFree() >= 1 ? "" : " disabled"}>Take</button></div></td></tr>`).join("");
+  showPanel(`<header><div><h2 id="pTitle">${esc(o.name)}</h2><div class="tag">${LAND.build[o.kind].n} · ${esc(s.name)}, ${esc(bodyName(s.body))}</div></div><div class="tag num">${fmtGold(G.gold)} · hold ${Math.floor(cargoUsed())}/${shipDef().cargo}</div></header>
+    <div class="body">${note ? `<p class="note" style="margin-top:0;color:var(--brass-hi)">${note}</p>` : ""}<canvas class="scene wide" id="opScene"></canvas>
+    <div class="grid2">
+      <div class="card"><h3>The works</h3><p class="note">${Math.floor(o.stock)} of ${outpostCap(s, o)} tons of ${GOODS[prod].n.toLowerCase()} ready, at about ${(outpostRate(s, o) * 30).toFixed(0)} tons a month. When the bunkers are full, the surplus is sold to passing ships and the takings kept for you.</p>
+        <div class="row" style="gap:6px;flex-wrap:wrap"><button class="b sm main" id="opLoad"${o.stock >= 1 && cargoFree() >= 1 ? "" : " disabled"}>Load ${Math.floor(Math.min(o.stock, cargoFree()))} tons</button>
+        ${(o.till || 0) >= 1 ? `<button class="b sm main" id="opTill">Collect ${fmtGold(Math.floor(o.till))} takings</button>` : ""}
+        ${o.lvl < 3 ? `<button class="b sm" id="opLvl"${G.gold >= LAND.lvlCost * o.lvl ? "" : " disabled"}>Enlarge the works · ${fmtGold(LAND.lvlCost * o.lvl)}</button>` : `<span class="note">The works are as large as the ground allows.</span>`}</div></div>
+      <div class="card"><h3>Garrison</h3><p class="note">${o.garrison} hands stand guard${o.wall ? " behind a palisade and a signal gun" : ""}. ${o.garrison + (o.wall ? 10 : 0) >= 14 ? "They should see off most raiders." : o.garrison + (o.wall ? 10 : 0) >= 6 ? "They can hold against a small raid." : "The place is all but undefended."}</p>
+        <div class="row" style="gap:6px"><button class="b sm" id="opG1"${G.ship.crew > 8 && o.garrison < 20 ? "" : " disabled"}>Leave 2 hands</button><button class="b sm" id="opG0"${o.garrison >= 1 ? "" : " disabled"}>Take 2 back</button>
+        ${o.wall ? "" : `<button class="b sm" id="opWall"${G.gold >= LAND.wallCost ? "" : " disabled"}>Palisade and gun · ${fmtGold(LAND.wallCost)}</button>`}</div></div>
+    </div>
+    <h3 style="font:20px var(--display);color:var(--brass-hi);margin:14px 0 4px">Warehouse <span class="note">${stored} of ${LAND.storeCap} tons</span></h3>
+    ${rows ? `<div style="overflow-x:auto" class="mk"><table class="t"><thead><tr><th>Goods</th><th class="r">Hold</th><th class="r">Stored</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="note">Nothing stored, and nothing in your hold to store.</p>`}</div>
+    <footer><button class="b main" id="opBack" autofocus>Back</button></footer>`, e => { if (e.key === "Escape") back(); });
+  drawLandScene($("opScene"), s, { camp: true, outpost: o, wide: true });
+  const re = n => outpostScreen(s, n), on = (id, fn) => { if ($(id)) $(id).onclick = fn; };
+  $("opBack").onclick = back;
+  on("opLoad", () => { const n = Math.floor(Math.min(o.stock, cargoFree())); o.stock -= n; addCargo(prod, n); re(`${n} tons of ${GOODS[prod].n.toLowerCase()} loaded.`); });
+  on("opTill", () => { const n = Math.floor(o.till); o.till -= n; G.gold += n; re(`${fmtGold(n)} in takings collected.`); });
+  on("opLvl", () => { G.gold -= LAND.lvlCost * o.lvl; o.lvl++; re("The works are enlarged."); });
+  on("opG1", () => { const n = Math.min(2, G.ship.crew - 8, 20 - o.garrison); G.ship.crew -= n; o.garrison += n; re(); });
+  on("opG0", () => { const n = Math.min(2, o.garrison, shipDef().crew - G.ship.crew); if (n < 1) return toast("No berths free aboard."); G.ship.crew += n; o.garrison -= n; re(); });
+  on("opWall", () => { G.gold -= LAND.wallCost; o.wall = true; re("A palisade goes up, with a signal gun on the corner."); });
+  panel.querySelectorAll("[data-put]").forEach(b => b.onclick = () => { const g = b.dataset.put, n = Math.floor(Math.min(has(g), LAND.storeCap - stored)); addCargo(g, -n); o.store[g] = (o.store[g] || 0) + n; re(); });
+  panel.querySelectorAll("[data-take]").forEach(b => b.onclick = () => { const g = b.dataset.take, n = Math.floor(Math.min(o.store[g], cargoFree())); addCargo(g, n); o.store[g] -= n; if (o.store[g] < 1) delete o.store[g]; re(); });
+}
+function holdingsScreen(back) {
+  back = typeof back === "function" ? back : () => { closePanel(); resumeMap(); };
+  const list = outposts();
+  const rows = list.map(({ site, o }) => `<tr><td><b>${esc(o.name)}</b><div class="note">${LAND.build[o.kind].n} · ${esc(site.name)}, ${esc(bodyName(site.body))}</div></td>
+    <td>${o.ruined ? `<span style="color:var(--bad)">Burned</span>` : `${Math.floor(o.stock)} tons of ${GOODS[outpostProduct(site, o)].n.toLowerCase()}`}<div class="note">${Object.values(o.store).reduce((a, b) => a + b, 0)} tons in the warehouse${(o.till || 0) >= 1 ? ` · ${fmtGold(Math.floor(o.till))} takings` : ""}</div></td>
+    <td class="r num">${o.garrison}${o.wall ? " + gun" : ""}</td></tr>`).join("");
+  showPanel(`<header><div><h2 id="pTitle">Holdings</h2><div class="tag">${G.charter ? `Chartered by the ${NATIONS[G.charter].name}` : "No charter"} · as last reported by heliograph</div></div></header>
+    <div class="body">${rows ? `<div style="overflow-x:auto"><table class="t"><thead><tr><th>Establishment</th><th>Ready to load</th><th class="r">Garrison</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="note">You hold no outposts yet.</p>`}</div>
+    <footer><button class="b main" id="hdBack" autofocus>Back</button></footer>`, e => { if (e.key === "Escape") back(); });
+  if (mode === "map") mode = "panel"; $("hdBack").onclick = back;
+}
+
+// ---------- hooks into ports: suits at the shipwright, charters from governors ----------
+const _renderWright = renderWright;
+renderWright = function (p) {
+  _renderWright(p);
+  if (!(p.kind === "capital" || p.id === "ceres")) return;
+  const d = document.createElement("div"); d.className = "card"; d.style.marginTop = "12px";
+  d.innerHTML = `<h3>Pressure suits</h3><p class="note">Brass helmets, rubberised canvas and air bottles for a landing party. Needed to set foot on the Moon, the asteroids, or any airless ground.</p>` +
+    (G.suits ? `<p class="note" style="color:var(--good)">You carry a set.</p>` : `<button class="b sm main" id="wSuits"${G.gold >= LAND.suitsCost ? "" : " disabled"}>Buy a set for ${fmtGold(LAND.suitsCost)}</button>`);
+  $("portBody").appendChild(d);
+  if ($("wSuits")) $("wSuits").onclick = () => { G.gold -= LAND.suitsCost; G.suits = true; logMsg("Bought pressure suits."); openPort(p.id, "wright"); };
+};
+const _renderGov = renderGov;
+renderGov = function (p) {
+  _renderGov(p);
+  if (!GREAT.includes(p.nat) || G.rep[p.nat] < 0) return;
+  const d = document.createElement("div"); d.className = "card"; d.style.marginTop = "12px";
+  if (G.charter) d.innerHTML = `<h3>Colonial charter</h3><p class="note">You hold a charter from the ${NATIONS[G.charter].name} to build stations on unclaimed moons and asteroids.</p>`;
+  else if (G.rep[p.nat] < 15) d.innerHTML = `<h3>Colonial charter</h3><p class="note">The governor grants charters only to captains he thinks well of (friendly standing).</p>`;
+  else d.innerHTML = `<h3>Colonial charter</h3><p class="note">Leave to build coaling stations and mining outposts on unclaimed moons and asteroids, under ${NATIONS[p.nat].short}'s protection, such as it is.</p>
+    <button class="b sm main" id="gCharter"${G.gold >= LAND.charterCost ? "" : " disabled"}>Buy the charter for ${fmtGold(LAND.charterCost)}</button>`;
+  $("portBody").appendChild(d);
+  if ($("gCharter")) $("gCharter").onclick = () => { G.gold -= LAND.charterCost; G.charter = p.nat; logMsg(`Bought a colonial charter from ${NATIONS[p.nat].short}.`); toast("The charter is signed and sealed.", 3000); openPort(p.id, "gov"); };
+};
+const _defeat = defeat;
+defeat = function (...a) { landAbort = true; X = null; G.landed = null; return _defeat(...a); };
+
+// ---------- the chart: outposts shown beside their worlds ----------
+function drawOutposts(c, toS, z) {
+  for (const { site, o } of outposts()) {
+    const b = bodyPos(site.body, G.day), r = bodySize(site.body) + 5, [x, y] = toS(b.x - r * 0.7, b.y - r * 0.7);
+    c.strokeStyle = "#e8c873"; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x, y + 6); c.lineTo(x, y - 7); c.stroke();
+    c.fillStyle = o.ruined ? "#6d5d4a" : NATIONS[G.charter || G.nation].col; c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 8, y - 4.5); c.lineTo(x, y - 2); c.closePath(); c.fill();
+    if (z > 0.9) { c.font = `12px "Alegreya Sans", system-ui, sans-serif`; c.textAlign = "right"; c.fillStyle = "rgba(232,200,115,.9)"; c.fillText(o.name, x - 5, y + 3); }
+  }
+}
+
+// ===================== EXPEDITIONS (0.32) =====================
+// A landing party pushes into ruins or wild country one stage at a time. Every stage costs a
+// day's supplies (water, or air on airless ground). Push deeper for better finds, or turn back
+// while you still can.
+let X = null;
+const XPOSTS = { nav: "finds the way", surgeon: "tends the hurt", eng: "handles machinery and rock", marine: "leads the fighting", lens: "reads old writing", qm: "packs more out", factor: "deals with strangers" };
+
+function expeditionSetup(s, pick) {
+  const st = siteState(s.id), back = () => openLanding(s.body), maxParty = Math.max(0, Math.min(20, G.ship.crew - 6));
+  pick = pick || { party: Math.min(10, maxParty), sup: Math.min(s.exp.depth + 2, 8), offs: G.officers.filter(o => !(o.wounded > G.day)).map(o => o.id) };
+  const what = s.suits ? "air" : "water", cost = Math.ceil(pick.party * pick.sup / 25);
+  const offs = G.officers.map(o => { const hurt = o.wounded > G.day;
+    return `<label class="chk"><input type="checkbox" data-off="${o.id}"${pick.offs.includes(o.id) && !hurt ? " checked" : ""}${hurt ? " disabled" : ""}> <b>${esc(o.name)}</b>, ${POSTS[o.post].n.toLowerCase()} <span class="note">${hurt ? "wounded, stays aboard" : XPOSTS[o.post] || ""}</span></label>`; }).join("");
+  showPanel(`<header><div><h2 id="pTitle">${s.exp.kind === "ruin" ? "Into the ruins" : "Into the wild"}</h2><div class="tag">${esc(s.name)}, ${esc(bodyName(s.body))}</div></div><div class="tag num">${G.ship.crew} hands · provisions ${Math.floor(has("provisions"))}</div></header>
+    <div class="body"><canvas class="scene wide" id="xsScene"></canvas>
+      <div class="prose"><p>${s.exp.kind === "ruin" ? `The way in is ${s.exp.depth} stages deep, as near as anyone can tell.` : `The country runs ${s.exp.depth} stages from the landing ground to its heart.`} ${st.deepest ? `Your people have been as far as stage ${st.deepest}.` : "Nobody you know has been inside."}
+        Each stage uses one day's ${what}, and you'll need about half as much again to come back.</p></div>
+      <div class="grid2">
+        <div class="card"><h3>The party</h3><p class="note">More hands fight better and carry more, but drink more. Six stay to mind the ship.</p>
+          <div class="row" style="gap:6px"><button class="b sm" id="xsP0">−2</button><b class="num" style="min-width:5ch;text-align:center">${pick.party} hands</b><button class="b sm" id="xsP1">+2</button></div></div>
+        <div class="card"><h3>${s.suits ? "Air bottles" : "Water and rations"}</h3><p class="note">${pick.sup} days' ${what} for ${pick.party} hands takes ${cost} load${cost === 1 ? "" : "s"} of provisions from the hold.</p>
+          <div class="row" style="gap:6px"><button class="b sm" id="xsS0">−1</button><b class="num" style="min-width:5ch;text-align:center">${pick.sup} days</b><button class="b sm" id="xsS1">+1</button></div></div>
+      </div>
+      ${offs ? `<h3 style="font:20px var(--display);color:var(--brass-hi);margin:14px 0 4px">Officers going ashore</h3><div class="chks">${offs}</div><p class="note">Officers ashore share the dangers.</p>` : `<p class="note">You have no officers to send. They would make this safer.</p>`}
+    </div>
+    <footer><button class="b" id="xsBack">Back</button><button class="b main" id="xsGo" autofocus${pick.party >= 4 && has("provisions") >= cost ? "" : " disabled"}><span class="key">↵</span>Set out</button></footer>`,
+    e => { if (e.key === "Escape") back(); });
+  drawLandScene($("xsScene"), s, { camp: true, wide: true, party: Math.min(8, pick.party), marching: true });
+  const read = () => { pick.offs = [...panel.querySelectorAll("[data-off]:checked")].map(i => +i.dataset.off || i.dataset.off); };
+  const re = () => { read(); expeditionSetup(s, pick); };
+  $("xsBack").onclick = back;
+  $("xsP0").onclick = () => { pick.party = Math.max(4, pick.party - 2); re(); }; $("xsP1").onclick = () => { pick.party = Math.min(maxParty, pick.party + 2); re(); };
+  $("xsS0").onclick = () => { pick.sup = Math.max(2, pick.sup - 1); re(); }; $("xsS1").onclick = () => { pick.sup = Math.min(12, pick.sup + 1); re(); };
+  $("xsGo").onclick = () => { read(); if (pick.party < 4) return toast("You need at least four hands."); if (has("provisions") < cost) return toast("Not enough provisions for that.");
+    addCargo("provisions", -cost);
+    X = { s, kind: s.exp.kind, max: s.exp.depth, depth: 0, party: pick.party, hurt: 0, dead: 0, sup: pick.sup, haul: {}, gold: 0, fame: 0, offs: pick.offs.map(String), notes: [], what, hurtOffs: [] };
+    logMsg(`Sent ${pick.party} hands into ${s.name}.`); xAdvance(); };
+}
+const xOff = post => { const o = officerAt(post); return o && X.offs.includes(String(o.id)) && !(o.wounded > G.day) ? o : null; };
+const xeff = post => xOff(post) ? eff(post) : 0;
+const xAble = () => X.party - X.hurt - X.dead;
+function xHurt(n) { n = Math.max(0, Math.min(Math.round(n), xAble())); X.hurt += n; return n; }
+function xKill(n) { n = Math.max(0, Math.min(Math.round(n), X.party - X.dead)); const fromHurt = Math.min(X.hurt, n); X.hurt -= fromHurt; X.dead += n; return n; }
+function xGain(g, n) { n = Math.round(n * (1 + 0.3 * xeff("qm"))); if (n > 0) X.haul[g] = (X.haul[g] || 0) + n; return n; }
+function xOfficerRisk(p) { for (const id of X.offs) { const o = G.officers.find(q => String(q.id) === id); if (o && !(o.wounded > G.day) && Math.random() < p) { o.wounded = G.day + ri(15, 30); X.hurtOffs.push(o.name); return o; } } return null; }
+const men = n => n === 1 ? "one man" : `${n} men`;
+
+// ----- the events -----
+const XPLACE = {
+  desert: ["a dry wash between red buttes", "a plain of wind-polished stones", "the lee of a great dune"], canal: ["a causeway of fitted stone", "a dry lock-basin the size of a cathedral", "a colonnade half buried in sand"],
+  swamp: ["a black-water channel roofed with leaves", "a mud bank steaming in the heat", "a grove of trees with trunks like towers"], highland: ["a ledge above the cloud sea", "a saddle between two spires", "a hanging valley thick with moss"],
+  crater: ["a field of grey boulders", "the foot of a crater wall", "a rille as straight as a railway cutting"], rock: ["a gully of black scree", "an overhang glittering with frost", "a shelf of rock under the stars"],
+  twilight: ["a forest of waist-high crystals", "a slope the low Sun turns to copper", "a glassy flat that rings underfoot"], night: ["a cave mouth rimmed with ice", "a frozen lake as clear as glass", "a ravine where breath falls as snow"],
+  ruin: ["a hall of leaning columns", "a stair worn hollow by vanished feet", "a gallery lined with empty niches", "a chamber whose walls are covered in rings of writing"]
+};
+function xMakeEvent() {
+  const d = X.depth, s = X.s, ruin = X.kind === "ruin", inside = ruin && d >= 2, place = pickOne(inside ? XPLACE.ruin : XPLACE[s.terrain]);
+  const st = siteState(s.id), deep = d / X.max;
+  if (d === X.max) return xFinale(place);
+  const deck = [["hazard", 30], ["beast", ruin ? 16 : 32], ["find", 24], ["quiet", 10]];
+  if (ruin && inside) deck.push(["door", 18]); if (!s.suits && !inside) deck.push(["natives", 12]);
+  let roll = Math.random() * deck.reduce((a, b) => a + b[1], 0), k = "quiet"; for (const [n, w] of deck) { if (roll < w) { k = n; break; } roll -= w; }
+  const ev = { k, place, inside, opts: [] };
+  if (k === "quiet") { ev.title = "Good going"; ev.text = `You reach ${place} without trouble, and make camp.`; }
+  else if (k === "find") {
+    const fresh = d > st.deepest, kind = ruin ? "relics" : s.terrain === "desert" && Math.random() < 0.4 ? "apergy" : "specimens";
+    ev.title = ruin ? "Something left behind" : "A naturalist's prize";
+    if (!fresh) { ev.k = "quiet"; ev.text = `At ${place} you pass the place you stripped last time. Nothing new.`; }
+    else { const n = Math.max(1, Math.round((1 + deep * 2) * rnd(0.7, 1.3) * (1 + 0.4 * xeff("lens") * (ruin ? 1 : 0))));
+      ev.text = ruin ? `In ${place}, under the dust: worked metal and carved stone, untouched since it was set down.` : kind === "apergy" ? `At ${place} the rock is shot through with crystal that tugs gently upward in the hand.` : `At ${place} your naturalist finds creatures no museum has a name for.`;
+      ev.opts.push({ label: `Gather it up`, fn: () => { const got = xGain(kind, n); return `You pack out ${got} ${got === 1 ? "load" : "loads"} of ${GOODS[kind].n.toLowerCase()}.`; } }); }
+  }
+  else if (k === "hazard") {
+    const H = { desert: ["A sandstorm", "A wall of red dust comes down the wash faster than a man can run."], canal: ["A rotten causeway", "The stone underfoot sounds hollow, and a slab has already gone."], swamp: ["Fever mist", "A yellow mist rises off the water. The Lumari call it the breath that takes."],
+      highland: ["A knife-edge", "The only way on is a ridge a foot wide, with cloud on both sides."], crater: ["Rotten ground", "The crust of the plain breaks like pie-crust over a hollow."], rock: ["A slide", "Loose rock goes at a touch here, slowly, and then all at once."],
+      twilight: ["The Sun's edge", "The path climbs toward the day side, and the rock is already too hot to touch."], night: ["The cold", "The cold here cracks lamp glass and stiffens suit joints."], ruin: ["A dead-fall", "The floor of the passage tips. Somebody meant it to."] };
+    const [t, tx] = H[inside ? "ruin" : s.terrain]; ev.title = t; ev.text = `At ${place}: ${tx}`;
+    ev.opts.push({ label: `Go carefully (uses a day's ${X.what})`, fn: () => { X.sup = Math.max(0, X.sup - 1); return "You rope up, test every step, and lose most of a day. Nobody is hurt."; } });
+    ev.opts.push({ label: "Press on", fn: () => { const save = 0.5 * xeff("eng") + 0.35 * xeff("nav"), n = Math.random() < 0.3 + save ? 0 : xHurt(rnd(1, 2 + deep * 3)); const dead = n > 1 && Math.random() < 0.3 * (1 - 0.6 * xeff("surgeon")) ? xKill(1) : 0; const o = n ? xOfficerRisk(0.12) : null;
+      return n ? `It goes badly. ${men(n)} hurt${dead ? ", and one of them does not get up again" : ""}.${o ? ` ${o.name} is among the wounded.` : ""}` : `${xOff("eng") ? xOff("eng").name + " picks the line, and y" : "Y"}ou are through without a scratch.`; } });
+  }
+  else if (k === "beast") {
+    const Bz = { desert: "a sand-skate, flat as a table and fast as a horse", canal: "a pack of pale things that hunt the dry locks", swamp: "a swamp-lurker with a mouth like a steamer trunk", highland: "a cloud-ray, stooping out of the Sun", crater: "nothing that should live here, and yet it moves", rock: "rock-lice the size of terriers, drawn to your lamps",
+      twilight: "a crystal-backed crawler that has been watching you for an hour", night: "something white and many-legged under the ice", ruin: "the guardians: brass-jointed, patient, and still working" };
+    const what = Bz[inside ? "ruin" : s.terrain], str = (3 + d * 2.2) * rnd(0.7, 1.3);
+    ev.title = inside ? "The guardians" : "Something hunting"; ev.text = `At ${place}: ${what}.`;
+    ev.opts.push({ label: "Stand and fight", fn: () => { const pow = xAble() * (0.5 + 0.9 * xeff("marine")) * (G.skill === "fence" || G.skill === "gun" ? 1.2 : 1) * rnd(0.8, 1.2);
+      const n = xHurt(clamp(str * 1.6 - pow, 0, 6) * rnd(0.5, 1)), dead = n > 2 && Math.random() < 0.5 * (1 - 0.6 * xeff("surgeon")) ? xKill(1) : 0, o = n ? xOfficerRisk(0.15) : null;
+      const got = !inside && Math.random() < 0.6 ? xGain("specimens", 1) : 0;
+      return `${n ? `A sharp fight. ${men(n)} hurt${dead ? ", one killed" : ""}.` : "A volley, and it's over. Nobody is hurt."}${o ? ` ${o.name} is wounded.` : ""}${got ? " The carcass will fetch a price from the museums." : ""}`; } });
+    ev.opts.push({ label: `Go round (uses a day's ${X.what})`, fn: () => { X.sup = Math.max(0, X.sup - 1); return "You give it a wide berth. It costs most of a day."; } });
+  }
+  else if (k === "door") {
+    ev.title = "A sealed door"; ev.text = `${place.charAt(0).toUpperCase() + place.slice(1)} ends in a door: a disc of stone ringed with turning bands of the old writing.`;
+    const lens = xOff("lens");
+    if (lens || G.skill === "phil") ev.opts.push({ label: lens ? `Let ${lens.name} read it` : "Work out the rings yourself", fn: () => { X.fame += 1; const got = xGain("relics", 1); return `The bands turn, click, and the disc rolls aside. Behind it${got ? ", a niche with something in it" : ", the way on"}.`; } });
+    ev.opts.push({ label: `Study it (uses a day's ${X.what})`, fn: () => { X.sup = Math.max(0, X.sup - 1); return Math.random() < 0.7 ? "By trial and error, late in the day, the door rolls aside." : (X.blocked = true, "A day wasted. The door will not move, and this is as far as you go this time."); } });
+    ev.opts.push({ label: "Force it", fn: () => { if (Math.random() < 0.45 + 0.4 * xeff("eng")) return "Crowbars and a jack, and the door grinds open."; const n = xHurt(rnd(1, 3)); return `The door comes down all at once. ${men(n)} hurt under it. But the way is open.`; } });
+    return ev;
+  }
+  else if (k === "natives") {
+    const sp = { mars: "Skarr", venus: s.terrain === "highland" ? "Kesh" : "Lumari", mercury: "Selenn" }[s.body] || "Skarr", rep = (G.srep && G.srep[sp]) || 0;
+    ev.title = `${sp} on the trail`; ev.sp = sp;
+    ev.text = `At ${place} a party of ${sp} is waiting, having watched you come for miles. ${rep < -15 ? "They do not look pleased to see your flag." : "They seem more curious than anything."}`;
+    ev.opts.push({ label: "Share your water and talk", fn: () => { X.sup = Math.max(0, X.sup - 1); srepChange(sp, 3); if (rep >= -15) { X.guide = true; return `They take the water gravely, and one of them walks with you a while. The next stretch will go easier.`; } return "They take the water and say nothing. But they let you pass."; } });
+    if (has("firearms") >= 1 || has("textiles") >= 1) { const g = has("textiles") >= 1 ? "textiles" : "firearms"; ev.opts.push({ label: `Trade a load of ${GOODS[g].n.toLowerCase()} from the ship`, fn: () => { addCargo(g, -1); srepChange(sp, 2); const kind = sp === "Skarr" ? "apergy" : "specimens", got = xGain(kind, 2 + Math.round(2 * xeff("factor"))); return `A runner fetches it. In return: ${got} loads of ${GOODS[kind].n.toLowerCase()}, and directions.`; } }); }
+    ev.opts.push({ label: "Keep your distance", fn: () => rep < -15 && Math.random() < 0.5 ? (xHurt(rnd(1, 2)), srepChange(sp, -2), "Stones and a few arrows follow you out of sight. Someone is hit.") : "You nod, they nod, and you go on." });
+    return ev;
+  }
+  return ev;
+}
+function xFinale(place) {
+  const s = X.s, st = siteState(s.id), ruin = X.kind === "ruin", ev = { k: "finale", inside: ruin, place, opts: [] };
+  if (st.done) { ev.title = ruin ? "The inner chamber" : "The heart of the country"; ev.text = ruin ? "The inner chamber stands as you left it, stripped and silent." : "You stand again where you stood before. There is nothing new to take but the view."; return ev; }
+  if (ruin) { ev.title = "The inner chamber"; ev.text = "The last door opens on a round room. In the lamplight the walls are one great ring of writing, and at the centre a tablet of grey metal lies on a plinth, as if someone had only just put it down.";
+    ev.opts.push({ label: "Take the tablet and everything else", fn: () => { st.done = true; const got = xGain("relics", 3 + Math.round(X.max / 2)); X.gold += ri(250, 600); X.fame += 8; G.fragments++; return `You pack out ${got} loads of relics and a purse of old coin. The tablet you keep by you: its marks are a chart, and you have seen writing like it before.`; } }); }
+  else { ev.title = "The heart of the country"; ev.text = { desert: "From the last ridge the whole red basin opens out, and in its floor a seam of crystal catches the Sun.", swamp: "The channel opens into a still lagoon ringed with amber-trees older than London.", highland: "The highest spire, and on it the rookery: thousands of wings and nests lined with shed scale.", twilight: "The crystal gardens end in a single spire taller than a church, singing faintly in the wind." }[s.terrain] || "You have come as far as the country goes.";
+    ev.opts.push({ label: "Take what you can carry", fn: () => { st.done = true; const kind = s.terrain === "desert" ? "apergy" : s.terrain === "twilight" ? "quicksilver" : s.terrain === "swamp" ? "amber" : "specimens"; const got = xGain(kind, 4 + X.max); X.fame += 6; return `You load ${got} loads of ${GOODS[kind].n.toLowerCase()}, and your naturalist fills three notebooks. The societies will want to hear of this.`; } }); }
+  return ev;
+}
+
+// ----- the loop -----
+function xAdvance() {
+  if (X.sup <= 0) return xShow({ k: "quiet", title: `Out of ${X.what}`, text: `The last of the ${X.what} is gone. There is nothing for it but to turn back.`, opts: [], inside: X.kind === "ruin" && X.depth >= 2, forced: true });
+  X.sup -= X.guide ? 0.5 : 1; X.guide = false; X.depth++;
+  const st = siteState(X.s.id); X.ev = xMakeEvent(); xShow(X.ev);
+}
+function xShow(ev, result) {
+  const s = X.s, st = siteState(s.id), able = xAble(), atEnd = X.depth >= X.max, mustTurn = ev.forced || X.blocked || atEnd || able <= X.hurt || X.sup <= 0;
+  const needBack = Math.max(0, Math.ceil(X.depth / 2) - Math.round(xeff("nav")));
+  let buttons = "";
+  if (!result && ev.opts.length) buttons = ev.opts.map((o, i) => `<button class="choice" data-o="${i}"><b><span class="key">${i + 1}</span>${o.label}</b></button>`).join("");
+  else {
+    if (!mustTurn) buttons += `<button class="choice" id="xGo"><b><span class="key">Z</span>Push deeper</b><span>Stage ${X.depth + 1} of ${X.max} · uses a day's ${X.what}</span></button>`;
+    buttons += `<button class="choice" id="xBack"><b><span class="key">${mustTurn ? "Z" : "X"}</span>${atEnd ? "Start for home" : "Turn back"}</b><span>${needBack <= X.sup ? `The way back needs ${needBack} day${needBack === 1 ? "" : "s"}' ${X.what}; you have enough` : `The way back needs ${needBack} days' ${X.what} and you have ${Math.max(0, Math.floor(X.sup))}. It will be hard`}</span></button>`;
+  }
+  const haul = Object.entries(X.haul).map(([g, n]) => `${n} ${GOODS[g].n.toLowerCase()}`).concat(X.gold ? [fmtGold(X.gold)] : []).join(" · ") || "nothing yet";
+  const why = !result && ev.opts.length ? "" : X.blocked ? "The way on is shut." : able <= X.hurt && !atEnd ? "Too many are hurt to go on." : "";
+  showPanel(`<header><div><h2 id="pTitle">${esc(ev.title)}</h2><div class="tag">${esc(s.name)} · stage ${X.depth} of ${X.max}</div></div>
+      <div class="tag num">${able} fit${X.hurt ? ` · ${X.hurt} hurt` : ""}${X.dead ? ` · ${X.dead} lost` : ""} · ${X.what} ${Math.max(0, Math.floor(X.sup))} day${Math.floor(X.sup) === 1 ? "" : "s"}</div></header>
+    <div class="body"><canvas class="scene wide tall" id="xScene"></canvas>
+      <div class="xbar" aria-hidden="true">${Array.from({ length: X.max }, (_, i) => `<i class="${i < X.depth ? "on" : ""}"></i>`).join("")}</div>
+      <div class="prose"><p>${result ? esc(result) : esc(ev.text)}</p>${why ? `<p class="note">${why}</p>` : ""}</div>
+      <div class="choices one">${buttons}</div>
+      <p class="note" style="margin-bottom:0">Carried so far: ${haul}</p></div>`,
+    e => { const k = e.key.toLowerCase(); if (/^[1-9]$/.test(k)) { const b = panel.querySelector(`[data-o="${+k - 1}"]`); if (b) b.click(); } else if (k === "z" || k === "enter") { ($("xGo") || $("xBack") || {}).click?.(); } else if (k === "x") { if ($("xGo") && $("xBack")) $("xBack").click(); } });
+  drawLandScene($("xScene"), s, { wide: true, inside: ev.inside, event: result ? null : ev.k, sp: ev.sp, party: Math.min(8, able), hurt: X.hurt, marching: true, depth: X.depth });
+  panel.querySelectorAll("[data-o]").forEach(b => b.onclick = () => { const txt = ev.opts[+b.dataset.o].fn(); st.deepest = Math.max(st.deepest, X.depth); if (xAble() <= 0) return xReturn(true); xShow(ev, txt); });
+  if (!ev.opts.length || result) st.deepest = Math.max(st.deepest, X.depth);
+  if ($("xGo")) $("xGo").onclick = xAdvance; if ($("xBack")) $("xBack").onclick = () => xReturn(false);
+}
+function xReturn(rout) {
+  const s = X.s, needBack = Math.max(0, Math.ceil(X.depth / 2) - Math.round(xeff("nav"))), short = Math.max(0, needBack - Math.floor(X.sup));
+  let story = [];
+  if (rout) { xKill(Math.ceil((X.party - X.dead) * 0.4)); story.push("With nobody left on their feet, the party came apart. The survivors crawled back to the ship in ones and twos."); for (const g in X.haul) X.haul[g] = Math.floor(X.haul[g] / 3); }
+  else if (short > 0) { const lost = xKill(rnd(0.6, 1.4) * short * (1 - 0.5 * xeff("surgeon"))); story.push(`The last ${short === 1 ? "day" : `${short} days`} of the march out were made on empty ${X.what === "air" ? "bottles" : "canteens"}.${lost ? ` ${men(lost).charAt(0).toUpperCase() + men(lost).slice(1)} did not reach the ship.` : " By a miracle everyone reached the ship."}`); }
+  else story.push("The march out went by the book.");
+  // the hurt: most mend, a surgeon saves more
+  const died = Math.round(X.hurt * rnd(0, 0.35) * (1 - 0.8 * xeff("surgeon"))); if (died) { xKill(died); story.push(`${men(died).charAt(0).toUpperCase() + men(died).slice(1)} died of ${died === 1 ? "his" : "their"} hurts aboard.`); }
+  else if (X.hurt) story.push(`The hurt are mending${xOff("surgeon") ? `, thanks to ${xOff("surgeon").name}` : ""}.`);
+  G.ship.crew = Math.max(1, G.ship.crew - X.dead);
+  // the haul, as far as the hold allows
+  const got = []; let left = 0;
+  for (const [g, n] of Object.entries(X.haul)) { const take = Math.min(n, Math.floor(cargoFree())); if (take > 0) { addCargo(g, take); got.push(`${take} ${GOODS[g].n.toLowerCase()}`); } left += n - take; }
+  if (X.gold) { G.gold += X.gold; got.push(fmtGold(X.gold)); }
+  G.fame += X.fame; G.ship.morale = clamp(G.ship.morale + (got.length ? 6 : 0) - X.dead * 2.5, 0, 100);
+  if (X.fame >= 6) G.reports++;
+  const days = Math.ceil(X.depth * 0.75) + 1, hurtOffs = X.hurtOffs, depth = X.depth, max = X.max, dead = X.dead;
+  logMsg(`The party returned from ${s.name}${dead ? `, ${dead} short` : ""}${got.length ? ` with ${got.join(", ")}` : ""}.`);
+  X = null; if (!passDays(days)) return;
+  showPanel(`<header><div><h2 id="pTitle">Back aboard</h2><div class="tag">${esc(s.name)} · reached stage ${depth} of ${max} · ${days} days ashore</div></div></header>
+    <div class="body"><canvas class="scene wide" id="xrScene"></canvas><div class="prose">${story.map(t => `<p>${esc(t)}</p>`).join("")}
+      <p>${got.length ? `Stowed: ${got.join(", ")}.` : "You bring back nothing but the story."}${left ? ` There was no room in the hold for ${left} more loads, and they were left on the beach.` : ""}</p>
+      ${hurtOffs.length ? `<p class="note">${hurtOffs.map(esc).join(" and ")} will be some weeks mending.</p>` : ""}</div></div>
+    <footer><button class="b main" id="xrOk" autofocus><span class="key">↵</span>Carry on</button></footer>`, e => { if (e.key === "Enter" || e.key === "Escape") $("xrOk").click(); });
+  drawLandScene($("xrScene"), s, { camp: true, wide: true });
+  $("xrOk").onclick = () => { save(); openLanding(s.body); };
+}
+
+// ===================== LANDING SCENES (0.32) =====================
+// Paints a landing site: sky and ground for each kind of world, the grounded ship and camp, an
+// outpost if one stands there, a landing party on the march, and whatever an expedition has met.
+function drawLandScene(cv, site, o) {
+  if (!cv) return; o = o || {};
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 320, H = cv.clientHeight || 130;
+  cv.width = W * dpr; cv.height = H * dpr; const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  let sd = 7; for (const ch of site.id) sd = (sd * 31 + ch.charCodeAt(0)) % 2147483647; sd += (o.depth || 0) * 7919;
+  const R = () => (sd = (sd * 16807) % 2147483647) / 2147483647, RR = (a, b) => a + R() * (b - a);
+  const T = site.terrain, gy = H * 0.68, u = H / 130;   // ground line; u = one "unit" of scale
+  const grad = (y0, y1, a, b) => { const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, a); g.addColorStop(1, b); return g; };
+  const hills = (y, amp, col, n, jag) => { c.fillStyle = col; c.beginPath(); c.moveTo(0, H); c.lineTo(0, y); let x = 0; while (x < W) { const w = RR(W / n * 0.5, W / n * 1.5), h = RR(0.2, 1) * amp; if (jag) { c.lineTo(x + w * RR(0.3, 0.7), y - h); c.lineTo(x + w, y - RR(0, 0.2) * amp); } else c.quadraticCurveTo(x + w / 2, y - h * 2, x + w, y - RR(0, 0.15) * amp); x += w; } c.lineTo(W, H); c.closePath(); c.fill(); };
+  const starsky = () => { c.fillStyle = "#07090d"; c.fillRect(0, 0, W, H); for (let i = 0; i < W / 3; i++) { c.fillStyle = `rgba(239,226,196,${RR(0.2, 0.9)})`; const r = RR(0.4, 1.3); c.fillRect(R() * W, R() * gy, r, r); } };
+  const disc = (x, y, r, col, lit) => { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); if (lit) { c.fillStyle = lit; c.beginPath(); c.arc(x - r * 0.25, y - r * 0.25, r * 0.7, 0, TAU); c.fill(); } };
+
+  if (o.inside) {   // ---- inside a ruin: a lamplit hall ----
+    c.fillStyle = "#0b0a09"; c.fillRect(0, 0, W, H);
+    const lx = W * 0.3, lg = c.createRadialGradient(lx, gy - 20 * u, 4, lx, gy - 20 * u, W * 0.55); lg.addColorStop(0, "rgba(255,196,120,.55)"); lg.addColorStop(0.5, "rgba(190,120,60,.18)"); lg.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = "#2b2520"; c.fillRect(0, gy, W, H - gy); c.fillStyle = "#1c1814"; c.fillRect(0, 0, W, gy);
+    // blocks of the back wall, rings of writing
+    c.strokeStyle = "rgba(0,0,0,.45)"; c.lineWidth = 1; for (let y = 8 * u; y < gy; y += 16 * u) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); for (let x = (y / u) % 32 ? 0 : 20 * u; x < W; x += 40 * u) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 16 * u); c.stroke(); } }
+    c.strokeStyle = "rgba(201,161,74,.28)"; for (let i = 0; i < 3; i++) { const x = RR(0.45, 0.95) * W, y = RR(0.2, 0.75) * gy, r = RR(7, 13) * u; c.lineWidth = 1.2; c.beginPath(); c.arc(x, y, r, 0, TAU); c.stroke(); c.beginPath(); c.arc(x, y, r * 0.55, 0, TAU); c.stroke(); for (let k = 0; k < 9; k++) { const a = k / 9 * TAU; c.beginPath(); c.moveTo(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); c.stroke(); } }
+    // columns, some broken
+    for (let x = W * 0.08; x < W; x += W / 5) { const h = R() < 0.25 ? RR(0.3, 0.6) : 1, w = 13 * u; c.fillStyle = "#3a322a"; c.fillRect(x, gy - gy * h, w, gy * h); c.fillStyle = "#4b4136"; c.fillRect(x, gy - gy * h, w * 0.35, gy * h); c.fillStyle = "#2a241e"; c.fillRect(x - 3 * u, gy - 5 * u, w + 6 * u, 5 * u); if (h === 1) c.fillRect(x - 3 * u, 0, w + 6 * u, 6 * u); }
+    c.fillStyle = "rgba(0,0,0,.35)"; for (let i = 0; i < 12; i++) c.fillRect(R() * W, gy + R() * (H - gy), RR(6, 20) * u, 2 * u);
+    c.fillStyle = lg; c.fillRect(0, 0, W, H);
+  } else if (T === "desert" || T === "canal") {   // ---- Mars ----
+    c.fillStyle = grad(0, gy, "#c9824e", "#f0c592"); c.fillRect(0, 0, W, H); disc(W * 0.78, gy * 0.3, 5 * u, "#fff3d6");
+    hills(gy, 26 * u, "#b5653a", 4, true); hills(gy + 2, 10 * u, "#a3522c", 6);
+    c.fillStyle = grad(gy, H, "#b9582e", "#7c3418"); c.fillRect(0, gy, W, H - gy);
+    if (T === "canal") { c.fillStyle = "#5a2a16"; c.beginPath(); c.moveTo(W * 0.52, gy); c.lineTo(W * 0.6, gy); c.lineTo(W * 1.0, H); c.lineTo(W * 0.62, H); c.closePath(); c.fill();
+      c.fillStyle = "#d8a070"; for (let i = 0; i < 6; i++) { const k = i / 6, x = W * (0.5 - k * 0.12), y = gy + k * (H - gy) * 0.8, h = (10 + k * 26) * u; c.fillRect(x - h * 0.12, y - h, h * 0.24, h); c.fillRect(x - h * 0.2, y - h, h * 0.4, h * 0.08); }
+      c.fillStyle = "#8a4526"; c.fillRect(W * 0.12, gy - 20 * u, 26 * u, 20 * u); c.fillRect(W * 0.16, gy - 30 * u, 12 * u, 10 * u); c.fillStyle = "#5a2a16"; c.fillRect(W * 0.15, gy - 10 * u, 5 * u, 10 * u); }
+    else for (let i = 0; i < 5; i++) { const x = R() * W, w = RR(14, 36) * u, h = RR(10, 30) * u; c.fillStyle = "#96482a"; c.fillRect(x, gy - h, w, h + 2); c.fillStyle = "#b5653a"; c.fillRect(x, gy - h, w * 0.3, h + 2); }
+    c.strokeStyle = "rgba(90,40,20,.35)"; for (let i = 0; i < 7; i++) { const y = gy + RR(6, H - gy - 2); c.beginPath(); c.moveTo(R() * W, y); c.quadraticCurveTo(W / 2, y - 5 * u, W, y + RR(-3, 3)); c.stroke(); }
+  } else if (T === "swamp") {   // ---- Venus, lowlands ----
+    c.fillStyle = grad(0, gy, "#8c8a4e", "#c9c27a"); c.fillRect(0, 0, W, H);
+    c.fillStyle = "rgba(240,235,190,.35)"; for (let i = 0; i < 5; i++) { c.beginPath(); c.ellipse(R() * W, RR(0.05, 0.4) * gy, RR(40, 90) * u, RR(6, 12) * u, 0, 0, TAU); c.fill(); }
+    hills(gy, 20 * u, "#55693a", 5);
+    if (site.id === "ven_zig") { c.fillStyle = "#4c6248"; for (let i = 0; i < 5; i++) { const w = (120 - i * 22) * u, h = 11 * u; c.fillRect(W * 0.62 - w / 2, gy - (i + 1) * h + 4 * u, w, h); } c.fillStyle = "#33452f"; c.fillRect(W * 0.62 - 5 * u, gy - 12 * u, 10 * u, 16 * u); }
+    c.fillStyle = grad(gy, H, "#3f4f2c", "#1f2a18"); c.fillRect(0, gy, W, H - gy);
+    c.fillStyle = "rgba(150,170,110,.35)"; for (let i = 0; i < 4; i++) { c.beginPath(); c.ellipse(R() * W, gy + RR(8, H - gy - 4), RR(20, 50) * u, RR(3, 6) * u, 0, 0, TAU); c.fill(); }
+    for (let i = 0; i < 7; i++) { const x = R() * W, h = RR(40, 85) * u, w = RR(3, 6) * u; c.fillStyle = "#26331d"; c.fillRect(x, gy - h + 10 * u, w, h); for (let k = 0; k < 5; k++) { c.beginPath(); c.ellipse(x + w / 2 + RR(-14, 14) * u, gy - h + RR(0, 22) * u, RR(10, 20) * u, RR(4, 7) * u, RR(-0.6, 0.6), 0, TAU); c.fillStyle = k % 2 ? "#324527" : "#3d5530"; c.fill(); } }
+    c.fillStyle = "rgba(230,230,180,.16)"; c.fillRect(0, gy - 12 * u, W, 20 * u);
+  } else if (T === "highland") {   // ---- Venus, above the clouds ----
+    c.fillStyle = grad(0, H, "#e9d59a", "#f6ecc4"); c.fillRect(0, 0, W, H); disc(W * 0.2, gy * 0.35, 9 * u, "#fffbe6");
+    for (let i = 0; i < 6; i++) { const x = R() * W, h = RR(30, 90) * u, w = RR(10, 22) * u; c.fillStyle = "#8f8a6a"; c.beginPath(); c.moveTo(x - w, H); c.lineTo(x - w * 0.5, gy - h * 0.6); c.lineTo(x, gy - h); c.lineTo(x + w * 0.6, gy - h * 0.5); c.lineTo(x + w, H); c.fill(); c.fillStyle = "#a9a37f"; c.beginPath(); c.moveTo(x - w, H); c.lineTo(x - w * 0.5, gy - h * 0.6); c.lineTo(x, gy - h); c.lineTo(x - w * 0.1, H); c.fill(); }
+    c.fillStyle = "rgba(255,252,235,.9)"; for (let i = 0; i < 12; i++) { c.beginPath(); c.ellipse(R() * W, gy + RR(-6, 10) * u, RR(30, 70) * u, RR(7, 13) * u, 0, 0, TAU); c.fill(); }
+    c.fillStyle = grad(gy + 6 * u, H, "#7d7a5c", "#5c5a44"); c.beginPath(); c.moveTo(0, H); c.lineTo(0, gy + 14 * u); c.quadraticCurveTo(W * 0.5, gy + 2 * u, W, gy + 16 * u); c.lineTo(W, H); c.fill();
+    c.strokeStyle = "#4a4634"; c.lineWidth = 1.2; for (let i = 0; i < 6; i++) { const x = R() * W, y = RR(0.1, 0.5) * gy, w = RR(4, 8) * u; c.beginPath(); c.moveTo(x - w, y - w * 0.4); c.quadraticCurveTo(x, y + w * 0.3, x, y); c.quadraticCurveTo(x, y + w * 0.3, x + w, y - w * 0.4); c.stroke(); }
+  } else if (T === "crater" || T === "rock") {   // ---- the Moon and the asteroids ----
+    starsky();
+    if (T === "crater") { disc(W * 0.76, gy * 0.32, 13 * u, "#2f6fb2", "#4f8fd0"); c.fillStyle = "rgba(255,255,255,.7)"; c.beginPath(); c.ellipse(W * 0.76 - 3 * u, gy * 0.32 - 2 * u, 8 * u, 3 * u, 0.4, 0, TAU); c.fill(); c.fillStyle = "#07090d"; c.beginPath(); c.arc(W * 0.76 + 7 * u, gy * 0.32 + 3 * u, 13 * u, 0, TAU); c.fill(); }
+    else if (site.sky === "mars") { disc(W * 0.8, gy * 0.5, 34 * u, "#9a4424", "#c4562f"); c.strokeStyle = "rgba(60,20,10,.4)"; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(W * 0.8 - 30 * u, gy * 0.5 + RR(-20, 20) * u); c.lineTo(W * 0.8 + 30 * u, gy * 0.5 + RR(-20, 20) * u); c.stroke(); } }
+    else disc(W * 0.8, gy * 0.25, 2.5 * u, "#fff6dc");
+    const g1 = T === "crater" ? "#8d8a82" : "#57514a", g2 = T === "crater" ? "#55524c" : "#2c2824", lit = T === "crater" ? "#b9b5aa" : "#7a7268";
+    hills(gy, (T === "rock" ? 30 : 16) * u, g2, T === "rock" ? 7 : 4, T === "rock"); c.fillStyle = grad(gy, H, g1, g2);
+    if (T === "rock") { c.beginPath(); c.moveTo(0, H); c.lineTo(0, gy + 8 * u); c.quadraticCurveTo(W / 2, gy - 8 * u, W, gy + 8 * u); c.lineTo(W, H); c.fill(); } else c.fillRect(0, gy, W, H - gy);
+    for (let i = 0; i < 6; i++) { const x = R() * W, y = gy + RR(8, H - gy - 4), w = RR(10, 34) * u; c.fillStyle = "rgba(0,0,0,.4)"; c.beginPath(); c.ellipse(x, y, w, w * 0.22, 0, 0, TAU); c.fill(); c.strokeStyle = lit; c.lineWidth = 1; c.beginPath(); c.ellipse(x, y, w, w * 0.22, 0, Math.PI * 0.1, Math.PI * 0.9); c.stroke(); }
+    for (let i = 0; i < 9; i++) { const x = R() * W, y = gy + RR(4, H - gy), w = RR(3, 9) * u; c.fillStyle = g2; c.beginPath(); c.moveTo(x - w, y); c.lineTo(x - w * 0.3, y - w); c.lineTo(x + w * 0.6, y - w * 0.7); c.lineTo(x + w, y); c.fill(); c.fillStyle = lit; c.beginPath(); c.moveTo(x - w, y); c.lineTo(x - w * 0.3, y - w); c.lineTo(x, y); c.fill(); }
+    if (site.ore === "coal") { c.fillStyle = "#0c0b0a"; for (let i = 0; i < 4; i++) { const y = gy + RR(6, H - gy - 6); c.beginPath(); c.moveTo(0, y); c.lineTo(W, y + RR(-8, 8) * u); c.lineTo(W, y + 4 * u); c.lineTo(0, y + 3 * u); c.fill(); } }
+    if (site.ore === "apergy") for (let i = 0; i < 7; i++) { const x = R() * W, y = gy + RR(10, H - gy - 2), h = RR(5, 12) * u; c.fillStyle = "rgba(170,220,255,.85)"; c.beginPath(); c.moveTo(x - h * 0.25, y); c.lineTo(x, y - h); c.lineTo(x + h * 0.25, y); c.fill(); }
+    if (site.id === "vesta_vault" || site.id === "moon_tycho") { const x = W * 0.66, w = 26 * u, h = 30 * u; c.fillStyle = g2; c.fillRect(x - w, gy - h, w * 2, h + 2); c.fillStyle = "#050505"; c.fillRect(x - w * 0.4, gy - h * 0.8, w * 0.8, h * 0.8 + 2); c.strokeStyle = "rgba(201,161,74,.6)"; c.lineWidth = 1.2; c.strokeRect(x - w * 0.4, gy - h * 0.8, w * 0.8, h * 0.8 + 2); }
+  } else if (T === "twilight") {   // ---- Mercury's dusk ----
+    c.fillStyle = grad(0, gy, "#120c14", "#e8743a"); c.fillRect(0, 0, W, H);
+    const sg = c.createRadialGradient(W * 0.25, gy, 4, W * 0.25, gy, 80 * u); sg.addColorStop(0, "#fff7d0"); sg.addColorStop(0.35, "#ffc15a"); sg.addColorStop(1, "rgba(255,150,60,0)"); c.fillStyle = sg; c.fillRect(0, 0, W, gy + 2);
+    disc(W * 0.25, gy + 6 * u, 34 * u, "#fff3c0"); hills(gy, 12 * u, "#3a2218", 5, true);
+    c.fillStyle = grad(gy, H, "#5a3222", "#1e120e"); c.fillRect(0, gy, W, H - gy);
+    for (let i = 0; i < 16; i++) { const x = R() * W, y = gy + RR(2, H - gy), h = RR(8, 34) * u * (0.4 + (y - gy) / (H - gy)); c.fillStyle = "rgba(255,190,120,.8)"; c.beginPath(); c.moveTo(x - h * 0.16, y); c.lineTo(x, y - h); c.lineTo(x + h * 0.05, y); c.fill(); c.fillStyle = "rgba(120,60,50,.9)"; c.beginPath(); c.moveTo(x + h * 0.05, y); c.lineTo(x, y - h); c.lineTo(x + h * 0.2, y); c.fill(); }
+  } else {   // ---- Mercury's night side ----
+    starsky(); c.fillStyle = "rgba(255,150,70,.25)"; c.fillRect(0, gy - 3 * u, W, 4 * u);
+    hills(gy, 22 * u, "#1c2a36", 5, true); c.fillStyle = grad(gy, H, "#3d5870", "#16222c"); c.fillRect(0, gy, W, H - gy);
+    c.strokeStyle = "rgba(200,230,255,.35)"; for (let i = 0; i < 10; i++) { const x = R() * W, y = gy + RR(4, H - gy); c.beginPath(); c.moveTo(x, y); c.lineTo(x + RR(-30, 30) * u, y + RR(4, 12) * u); c.stroke(); }
+    c.strokeStyle = "rgba(201,161,74,.35)"; c.lineWidth = 1.5; c.strokeRect(W * 0.55, gy + 8 * u, 60 * u, 14 * u); c.strokeRect(W * 0.58, gy + 11 * u, 20 * u, 8 * u);
+  }
+  const dark = o.inside || T === "crater" || T === "rock" || T === "night";
+
+  // ---- the grounded ship and camp ----
+  if (o.camp && !o.inside) { const x = W * (o.wide ? 0.16 : 0.24), y = gy + 14 * u, k = u * (o.wide ? 1 : 0.9);
+    c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(x, y + 2 * k, 40 * k, 5 * k, 0, 0, TAU); c.fill();
+    c.strokeStyle = "#3a2818"; c.lineWidth = 2 * k; for (const dx of [-18, 16]) { c.beginPath(); c.moveTo(x + dx * k, y - 8 * k); c.lineTo(x + (dx * 1.25) * k, y + 1 * k); c.stroke(); }
+    c.fillStyle = "#6b4a2b"; c.beginPath(); c.moveTo(x - 34 * k, y - 14 * k); c.quadraticCurveTo(x - 30 * k, y - 4 * k, x - 12 * k, y - 5 * k); c.lineTo(x + 24 * k, y - 6 * k); c.quadraticCurveTo(x + 40 * k, y - 10 * k, x + 44 * k, y - 16 * k); c.lineTo(x - 34 * k, y - 16 * k); c.closePath(); c.fill();
+    c.fillStyle = "#c9a14a"; c.fillRect(x - 34 * k, y - 17.5 * k, 78 * k, 2 * k); c.fillStyle = "#3a2818"; c.fillRect(x - 6 * k, y - 26 * k, 14 * k, 9 * k); c.fillStyle = "#2a1d12"; c.fillRect(x + 12 * k, y - 34 * k, 5 * k, 17 * k); c.fillStyle = "#c9a14a"; c.fillRect(x + 11 * k, y - 35 * k, 7 * k, 2 * k);
+    c.fillStyle = "#e8c873"; for (const dx of [-22, -12, 20]) { c.beginPath(); c.arc(x + dx * k, y - 11 * k, 1.5 * k, 0, TAU); c.fill(); }
+    c.fillStyle = "#d9c69a"; c.beginPath(); c.moveTo(x - 30 * k, y - 18 * k); c.lineTo(x - 22 * k, y - 40 * k); c.lineTo(x - 14 * k, y - 18 * k); c.fill(); c.strokeStyle = "#2a1d12"; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 22 * k, y - 42 * k); c.lineTo(x - 22 * k, y - 18 * k); c.stroke();
+    c.fillStyle = NATIONS[G.nation].col; c.fillRect(x - 22 * k, y - 46 * k, 8 * k, 4.5 * k);
+    if (!o.outpost) { const tx = x + 56 * k; c.fillStyle = "#cdbb8e"; c.beginPath(); c.moveTo(tx - 9 * k, y); c.lineTo(tx, y - 11 * k); c.lineTo(tx + 9 * k, y); c.fill(); c.fillStyle = "#8a7a56"; c.beginPath(); c.moveTo(tx - 2 * k, y); c.lineTo(tx, y - 6 * k); c.lineTo(tx + 2 * k, y); c.fill();
+      if (!site.suits) { c.fillStyle = "#ffb347"; c.beginPath(); c.arc(tx + 16 * k, y - 1.5 * k, 2.2 * k, 0, TAU); c.fill(); const fg = c.createRadialGradient(tx + 16 * k, y - 2 * k, 1, tx + 16 * k, y - 2 * k, 16 * k); fg.addColorStop(0, "rgba(255,180,80,.35)"); fg.addColorStop(1, "rgba(255,180,80,0)"); c.fillStyle = fg; c.fillRect(tx, y - 18 * k, 34 * k, 22 * k); } } }
+
+  // ---- an outpost: stockade, works, bunkers and flag ----
+  if (o.outpost) { const p = o.outpost, x = W * (o.wide ? 0.62 : 0.68), y = gy + 12 * u, k = u * (o.wide ? 1.15 : 0.85), dim = p.ruined;
+    const wood = dim ? "#2a221c" : "#6b4a2b", iron = dim ? "#25221f" : "#4a4640", brass = dim ? "#4a4030" : "#c9a14a";
+    c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(x, y + 2 * k, 56 * k, 5 * k, 0, 0, TAU); c.fill();
+    if (p.wall) { c.fillStyle = wood; for (let i = -52; i <= 52; i += 5) { c.beginPath(); c.moveTo(x + i * k, y); c.lineTo(x + i * k, y - 10 * k); c.lineTo(x + (i + 2.2) * k, y - 13 * k); c.lineTo(x + (i + 4.4) * k, y - 10 * k); c.lineTo(x + (i + 4.4) * k, y); c.fill(); } }
+    // bunkhouse with a domed pressure roof on airless ground
+    c.fillStyle = iron; c.fillRect(x - 40 * k, y - 16 * k, 30 * k, 16 * k); c.fillStyle = dim ? "#1c1a18" : "#7a756c"; if (site.suits) { c.beginPath(); c.ellipse(x - 25 * k, y - 16 * k, 15 * k, 8 * k, 0, Math.PI, 0); c.fill(); } else { c.beginPath(); c.moveTo(x - 43 * k, y - 16 * k); c.lineTo(x - 25 * k, y - 26 * k); c.lineTo(x - 7 * k, y - 16 * k); c.fill(); }
+    if (!dim) { c.fillStyle = "#ffcf7a"; c.fillRect(x - 35 * k, y - 11 * k, 5 * k, 5 * k); c.fillRect(x - 22 * k, y - 11 * k, 5 * k, 5 * k); }
+    if (p.kind === "coal") { // retort, chimney and coal heap
+      c.fillStyle = iron; c.fillRect(x - 4 * k, y - 22 * k, 16 * k, 22 * k); c.fillStyle = brass; c.fillRect(x - 4 * k, y - 14 * k, 16 * k, 1.5 * k); c.fillRect(x - 4 * k, y - 6 * k, 16 * k, 1.5 * k);
+      c.fillStyle = dim ? "#1c1a18" : "#3a3632"; c.fillRect(x + 14 * k, y - 38 * k, 6 * k, 38 * k);
+      if (!dim) { c.fillStyle = "rgba(200,200,200,.35)"; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(x + (19 + i * 5) * k, y - (42 + i * 7) * k, (4 + i * 2) * k, 0, TAU); c.fill(); } }
+      c.fillStyle = "#0c0b0a"; c.beginPath(); c.moveTo(x + 24 * k, y); c.lineTo(x + 36 * k, y - 12 * k * (0.3 + 0.7 * Math.min(1, p.stock / 40))); c.lineTo(x + 50 * k, y); c.fill(); }
+    else { // head-frame and ore tubs
+      c.strokeStyle = wood; c.lineWidth = 2 * k; c.beginPath(); c.moveTo(x - 2 * k, y); c.lineTo(x + 8 * k, y - 34 * k); c.lineTo(x + 18 * k, y); c.moveTo(x + 2 * k, y - 14 * k); c.lineTo(x + 14 * k, y - 14 * k); c.moveTo(x + 5 * k, y - 24 * k); c.lineTo(x + 11 * k, y - 24 * k); c.stroke();
+      c.fillStyle = brass; c.beginPath(); c.arc(x + 8 * k, y - 34 * k, 3.5 * k, 0, TAU); c.fill();
+      c.fillStyle = iron; for (let i = 0; i < 3; i++) { c.fillRect(x + (24 + i * 10) * k, y - 6 * k, 8 * k, 6 * k); c.fillStyle = dim ? "#1c1a18" : GOODS[site.ore] && site.ore === "apergy" ? "#9fd0f0" : site.ore === "quicksilver" ? "#c9ccd2" : "#8a6a4a"; if (p.stock > i * 10) c.fillRect(x + (25 + i * 10) * k, y - 8 * k, 6 * k, 2.5 * k); c.fillStyle = iron; } }
+    if (dim) { c.fillStyle = "rgba(0,0,0,.45)"; c.fillRect(x - 56 * k, y - 44 * k, 112 * k, 46 * k); }
+    else { c.strokeStyle = "#2a1d12"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x - 46 * k, y); c.lineTo(x - 46 * k, y - 34 * k); c.stroke(); c.fillStyle = NATIONS[G.charter || G.nation].col; c.fillRect(x - 46 * k, y - 34 * k, 11 * k, 6.5 * k); } }
+
+  // ---- what the expedition has met ----
+  const ex = W * 0.72, ey = gy + 16 * u;
+  if (o.event === "beast") { c.fillStyle = dark ? "#0a0908" : "rgba(20,14,10,.92)"; c.beginPath(); c.ellipse(ex, ey - 16 * u, 30 * u, 15 * u, -0.15, 0, TAU); c.fill(); c.beginPath(); c.ellipse(ex - 26 * u, ey - 22 * u, 12 * u, 9 * u, 0.3, 0, TAU); c.fill();
+    for (let i = 0; i < 5; i++) { c.beginPath(); c.moveTo(ex + (-18 + i * 9) * u, ey - 6 * u); c.lineTo(ex + (-22 + i * 9) * u, ey + 2 * u); c.lineTo(ex + (-14 + i * 9) * u, ey - 6 * u); c.fill(); }
+    for (let i = 0; i < 6; i++) { c.beginPath(); c.moveTo(ex + (-14 + i * 7) * u, ey - 28 * u); c.lineTo(ex + (-11 + i * 7) * u, ey - 38 * u); c.lineTo(ex + (-8 + i * 7) * u, ey - 28 * u); c.fill(); }
+    c.fillStyle = "#ffb347"; c.beginPath(); c.arc(ex - 30 * u, ey - 24 * u, 1.8 * u, 0, TAU); c.fill(); c.beginPath(); c.arc(ex - 24 * u, ey - 25 * u, 1.8 * u, 0, TAU); c.fill(); }
+  else if (o.event === "find" || o.event === "finale") { const gl = c.createRadialGradient(ex, ey - 10 * u, 2, ex, ey - 10 * u, 40 * u); gl.addColorStop(0, o.event === "finale" ? "rgba(170,220,255,.6)" : "rgba(255,215,120,.5)"); gl.addColorStop(1, "rgba(255,215,120,0)"); c.fillStyle = gl; c.fillRect(ex - 44 * u, ey - 54 * u, 88 * u, 60 * u);
+    if (o.event === "finale" && o.inside) { c.fillStyle = "#4b4136"; c.fillRect(ex - 10 * u, ey - 14 * u, 20 * u, 14 * u); c.fillStyle = "#9fb4c4"; c.fillRect(ex - 7 * u, ey - 18 * u, 14 * u, 4 * u); c.strokeStyle = "rgba(201,161,74,.7)"; c.lineWidth = 1.5; c.beginPath(); c.arc(ex, ey - 40 * u, 16 * u, 0, TAU); c.stroke(); c.beginPath(); c.arc(ex, ey - 40 * u, 10 * u, 0, TAU); c.stroke(); }
+    else { c.fillStyle = "#5c4416"; c.fillRect(ex - 9 * u, ey - 9 * u, 18 * u, 9 * u); c.fillStyle = "#c9a14a"; c.fillRect(ex - 9 * u, ey - 10.5 * u, 18 * u, 2 * u); c.fillRect(ex - 1.5 * u, ey - 8 * u, 3 * u, 4 * u); c.fillStyle = "#e8c873"; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(ex + (-14 + i * 9) * u, ey - (1 + (i % 2) * 2) * u, 1.6 * u, 0, TAU); c.fill(); } } }
+  else if (o.event === "hazard") { c.fillStyle = dark ? "#3a342e" : "rgba(60,36,22,.9)"; for (let i = 0; i < 8; i++) { const x = ex + RR(-34, 34) * u, y = ey - RR(0, 60) * u, w = RR(4, 10) * u; c.beginPath(); c.moveTo(x - w, y); c.lineTo(x - w * 0.2, y - w); c.lineTo(x + w, y - w * 0.3); c.lineTo(x + w * 0.5, y + w * 0.6); c.fill(); }
+    c.strokeStyle = "rgba(255,255,255,.25)"; c.lineWidth = 1; for (let i = 0; i < 6; i++) { const x = ex + RR(-30, 30) * u, y = ey - RR(10, 60) * u; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 3 * u, y - 12 * u); c.stroke(); } }
+  else if (o.event === "door") { c.fillStyle = "#4b4136"; c.beginPath(); c.arc(ex, ey - 26 * u, 26 * u, 0, TAU); c.fill(); c.strokeStyle = "rgba(201,161,74,.8)"; c.lineWidth = 1.6; for (const r of [24, 17, 10]) { c.beginPath(); c.arc(ex, ey - 26 * u, r * u, 0, TAU); c.stroke(); } for (let k = 0; k < 14; k++) { const a = k / 14 * TAU; c.beginPath(); c.moveTo(ex + Math.cos(a) * 17 * u, ey - 26 * u + Math.sin(a) * 17 * u); c.lineTo(ex + Math.cos(a) * 24 * u, ey - 26 * u + Math.sin(a) * 24 * u); c.stroke(); } }
+  else if (o.event === "natives") { const col = { Skarr: "#9a3a2c", Lumari: "#5c8a4a", Kesh: "#b89a4a", Selenn: "#9fd0f0" }[o.sp] || "#9a3a2c"; for (let i = 0; i < 4; i++) { const x = ex + (i * 13 - 16) * u, h = (24 + (i % 2) * 4) * u; c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(x, ey + 1, 6 * u, 1.6 * u, 0, 0, TAU); c.fill(); c.fillStyle = shade(col, -0.35); c.fillRect(x - 3.4 * u, ey - h * 0.72, 6.8 * u, h * 0.72); c.fillStyle = col; c.beginPath(); c.arc(x, ey - h * 0.82, 3.6 * u, 0, TAU); c.fill(); c.strokeStyle = "#2a1d12"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x + 5 * u, ey); c.lineTo(x + 5 * u, ey - h * 1.25); c.stroke(); } }
+
+  // ---- the landing party ----
+  if (o.party) { const n = o.party, k = u * (o.wide ? 1.05 : 0.8), base = gy + 22 * u, x0 = W * (o.marching ? (o.camp ? 0.42 : 0.2) : 0.5);
+    for (let i = 0; i < n; i++) { const x = x0 + i * 11 * k, y = base + (i % 2) * 3 * k; explorer(c, x, y, k, site.suits, i === n - 1, i % 3 === 1, i < (o.hurt || 0)); }
+    if (o.inside) { const lx = x0 + n * 11 * k; c.fillStyle = "#ffd27a"; c.beginPath(); c.arc(lx, base - 13 * k, 2 * k, 0, TAU); c.fill(); } }
+  // soft vignette
+  const vg = c.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.75); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.45)"); c.fillStyle = vg; c.fillRect(0, 0, W, H);
+  if (o.hide) { c.fillStyle = "rgba(14,19,27,.45)"; c.fillRect(0, 0, W, H); }
+}
+// One member of a landing party: pith helmet and khaki, or brass helmet and canvas suit.
+function explorer(c, x, y, k, suit, lead, rifle, hurt) {
+  c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(x, y + 0.5 * k, 5 * k, 1.4 * k, 0, 0, TAU); c.fill();
+  const body = suit ? "#b9a57a" : "#b8a070", dk = suit ? "#7a6a48" : "#6e5c3c";
+  c.strokeStyle = suit ? dk : "#3a2a1c"; c.lineWidth = 2.6 * k; c.lineCap = "round"; c.beginPath(); c.moveTo(x - 1 * k, y - 8 * k); c.lineTo(x - 3 * k, y); c.moveTo(x + 1 * k, y - 8 * k); c.lineTo(x + 3 * k, y); c.stroke();
+  c.fillStyle = dk; c.fillRect(x - 3.6 * k, y - 18 * k, 7.2 * k, 11 * k); c.fillStyle = body; c.fillRect(x - 3.6 * k, y - 18 * k, 4.6 * k, 11 * k);
+  c.fillStyle = "#4a3a22"; c.fillRect(x - 6 * k, y - 17 * k, 3 * k, 8 * k);   // pack
+  if (suit) { c.fillStyle = "#c9a14a"; c.beginPath(); c.arc(x, y - 21.5 * k, 4.2 * k, 0, TAU); c.fill(); c.fillStyle = "#1a2a36"; c.beginPath(); c.arc(x + 1.4 * k, y - 21.5 * k, 2.1 * k, 0, TAU); c.fill(); c.fillStyle = "#8a6a2a"; c.fillRect(x - 4 * k, y - 18.5 * k, 8 * k, 1.5 * k); }
+  else { c.fillStyle = "#d9a57c"; c.beginPath(); c.arc(x, y - 21 * k, 3 * k, 0, TAU); c.fill(); c.fillStyle = "#e9dcb8"; c.beginPath(); c.ellipse(x, y - 23 * k, 5 * k, 1.3 * k, 0, 0, TAU); c.fill(); c.beginPath(); c.arc(x, y - 23.3 * k, 3.2 * k, Math.PI, 0); c.fill(); }
+  if (hurt) { c.fillStyle = "#e9e2d2"; c.fillRect(x - 3.6 * k, y - 14 * k, 7.2 * k, 2 * k); }
+  if (rifle) { c.strokeStyle = "#2a1d12"; c.lineWidth = 1.2 * k; c.beginPath(); c.moveTo(x + 3 * k, y - 10 * k); c.lineTo(x + 6 * k, y - 26 * k); c.stroke(); }
+  if (lead) { c.strokeStyle = "#2a1d12"; c.lineWidth = 1 * k; c.beginPath(); c.moveTo(x + 4 * k, y - 14 * k); c.lineTo(x + 8 * k, y - 15 * k); c.stroke(); c.fillStyle = "#ffd27a"; c.fillRect(x + 7 * k, y - 15 * k, 2.4 * k, 3.4 * k); }
 }
 
 // ===================== AETHERFORGE GAME =====================
@@ -2999,6 +3807,7 @@ function dayTick() {
   if (s.morale <= 0) { defeat("Starving and furious, the crew mutinied and put you off at the nearest port.", { mutiny: true }); return; }
   if (s.morale < 20 && Math.random() < 0.15) toast("Grumbling below decks. Morale is dangerously low.");
   officersDaily();
+  outpostsDaily();
   driftPrices();
   for (const st of G.storms) { st.life--; }
   G.storms = G.storms.filter(st => st.life > 0);
@@ -3108,6 +3917,7 @@ function drawMap(t) {
     drawShip2(c, x, y, a.h, Math.max(0.42, z * 0.55) * SHIPS[a.type].size, a.type, a.corsair ? "pirate" : a.nat, a.role, t, true, null);
     if (a.chasing) { c.strokeStyle = "rgba(224,97,63,.8)"; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, 16, 0, TAU); c.stroke(); }
   }
+  drawOutposts(c, toS, z);
   drawNetShips(c, t, z);
   drawFleetOnChart(c, t, z);
   // wake + player
@@ -3151,13 +3961,16 @@ mcv.addEventListener("pointerup", e => {
   let best = null, bd = tol;
   for (const p of PORTS) { const pp = portPos(p), d = Math.hypot(pp.x - wx, pp.y - wy); if (d < bd) { bd = d; best = { port: p.id }; } }
   for (const a of G.ais) { const d = Math.hypot(a.x - wx, a.y - wy); if (d < bd) { bd = d; best = { ai: a.id }; } }
+  if (!best) for (const id of LAND_BODIES) { const b = bodyPos(id, G.day); if (Math.hypot(b.x - wx, b.y - wy) < Math.max(bodySize(id), tol)) best = { land: id }; }
   G.target = best || { x: wx, y: wy };
   if (paused) togglePause();
+  if (G.target.land) toast(`Course set to land on ${bodyName(G.target.land)}`, 1800);
   if (G.target.port) toast(`Course set for ${PORT[G.target.port].name}`, 1800);
 });
 function targetPos() {
   const t = G.target; if (!t) return null;
   if (t.port) return portPos(PORT[t.port]);
+  if (t.land) return landingPoint(t.land);
   if (t.ai) { const a = G.ais.find(q => q.id === t.ai); if (!a) { G.target = null; return null; } return a; }
   return t;
 }
@@ -3185,6 +3998,7 @@ function stepMap(dt) {
     const want = Math.atan2(tg.y - s.y, tg.x - s.x);
     s.h += clamp(angDiff(s.h, want), -3.2 * def.turn * dd, 3.2 * def.turn * dd);
     if (G.target.port && Math.hypot(tg.x - s.x, tg.y - s.y) < 10) { const id = G.target.port; G.target = null; tryDock(id); return; }
+    if (G.target.land && Math.hypot(tg.x - s.x, tg.y - s.y) < 8) { const id = G.target.land; G.target = null; openLanding(id); return; }
     if (!G.target.port && !G.target.ai && Math.hypot(tg.x - s.x, tg.y - s.y) < 6) { G.target = null; paused = true; $("btnPause").classList.add("on"); }
   }
   // speed through the aether
@@ -3213,6 +4027,7 @@ function stepMap(dt) {
 // ---------- HUD ----------
 let hudT = 0;
 function updateHud() {
+  $("btnHold").hidden = !outposts().length;
   $("btnFleet").hidden = !fleetList().length; if (!$("btnFleet").hidden) $("btnFleet").textContent = `Fleet · ${fleetSize()}`;
   const s = G.ship, def = shipDef();
   const near = nearestPortName();
@@ -3237,6 +4052,7 @@ function updateHud() {
   const nb = $("nearby"); const items = [];
   // Numbered so keys 1-9 pick an entry. Order stays put while ships move: ports first, then ships as they came in sight.
   for (const p of PORTS) { const pp = portPos(p); if (Math.hypot(pp.x - s.x, pp.y - s.y) < 22) items.push(n => `<button class="b" data-port="${p.id}"><span class="key">${n}</span>Make port at ${esc(p.name)}</button>`); }
+  for (const id of LAND_BODIES) { const b = bodyPos(id, G.day); if (Math.hypot(b.x - s.x, b.y - s.y) < bodySize(id) + 26) items.push(n => `<button class="b" data-land="${id}"><span class="key">${n}</span>Land on ${esc(bodyName(id))}</button>`); }
   const reach = (60 + 30 * eff("nav")) * (WORLD > 1 ? 1.5 : 1);
   G.ais.filter(a => Math.hypot(a.x - s.x, a.y - s.y) < reach).sort((a, b) => a.id - b.id).forEach(a => {
     const hostile = aiHostile(a);
@@ -3248,7 +4064,7 @@ function updateHud() {
 }
 $("nearby").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.port) tryDock(b.dataset.port); else if (b.dataset.ai) openEncounter(+b.dataset.ai); else if (b.dataset.net) netCaptainScreen(b.dataset.net);
+  if (b.dataset.port) tryDock(b.dataset.port); else if (b.dataset.ai) openEncounter(+b.dataset.ai); else if (b.dataset.net) netCaptainScreen(b.dataset.net); else if (b.dataset.land) openLanding(b.dataset.land);
 });
 function nearestPortName() {
   for (const p of PORTS) { const pp = portPos(p); if (Math.hypot(pp.x - G.ship.x, pp.y - G.ship.y) < 30) return p.name; }
@@ -3354,7 +4170,7 @@ function tryDock(id) {
   const pp = portPos(p); G.ship.x = pp.x; G.ship.y = pp.y;
   G.ship.morale = clamp(G.ship.morale + 8, 0, 100);
   logMsg(`Made port at ${p.name}.`);
-  officersAtPort();
+  officersAtPort(); landAtPort(p);
   save(); openPort(id);
 }
 let portTab = "market", tavern = null;
@@ -3392,13 +4208,13 @@ function leavePort() {
 
 // Market
 function renderMarket(p) {
-  const rows = Object.keys(GOODS).map(g => {
+  const rows = Object.keys(GOODS).filter(g => !GOODS[g].found || has(g) >= 1 || p.want.includes(g)).map(g => {
     const b = buyPrice(p.id, g), s = sellPrice(p.id, g), base = GOODS[g].b;
     const cls = b < base * 0.8 ? "cheap" : b > base * 1.3 ? "dear" : "";
     const note = p.make.includes(g) ? "made here" : p.want.includes(g) ? "wanted here" : "";
     return `<tr><td>${GOODS[g].n}<div class="note">${note}${has(g) >= 1 ? ` · hold ${Math.floor(has(g))}` : ""}</div></td><td class="r num ${cls}">${fmtGold(b)}</td><td class="r num">${fmtGold(s)}</td><td class="r num hideN">${Math.floor(has(g))}</td>
       <td class="r"><div class="row" style="justify-content:flex-end;gap:4px">
-      <button class="b sm" data-buy="${g}" data-n="1">Buy</button><button class="b sm" data-buy="${g}" data-n="10">+10</button>
+      ${GOODS[g].found ? `<span class="note">not sold here</span>` : `<button class="b sm" data-buy="${g}" data-n="1">Buy</button><button class="b sm" data-buy="${g}" data-n="10">+10</button>`}
       <button class="b sm" data-sell="${g}" data-n="1">Sell</button><button class="b sm" data-sell="${g}" data-n="all">All</button></div></td></tr>`;
   }).join("");
   $("portBody").innerHTML = `<p class="note" style="margin-top:0">Green prices are cheap for this port; amber are dear. One load of provisions feeds twenty hands for a month, and coal feeds the boilers.</p>
@@ -3616,6 +4432,9 @@ function captainScreen(back) {
       <div class="grid2">
         <div class="card"><h3>The ${esc(G.shipName)}</h3><div class="note">${d.n} · ${d.guns} guns</div><div class="note">${Object.keys(UPG).map(k => `${UPG[k].n} ${pips(G.ship.up[k])}`).join(" · ")}</div><div class="note num">Hull ${Math.round(s.hull)}/${d.hull} · vanes ${Math.round(s.vanes)}/${d.vanes} · crew ${s.crew}/${d.crew} · morale ${Math.round(s.morale)}</div></div>
         <div class="card"><h3>Your nemesis</h3><div class="note">${v.n}, ${v.d.toLowerCase()}.</div></div>
+        <div class="card"><h3>Ashore</h3><div class="note">${G.suits ? "Pressure suits aboard" : "No pressure suits"} · ${G.charter ? `colonial charter from ${NATIONS[G.charter].short}` : "no colonial charter"}</div>
+          <div class="note">${outposts().length} outpost${outposts().length === 1 ? "" : "s"} · ${Object.values(G.sites).filter(x => x.surveyed).length} of ${SITES.length} sites surveyed${G.reports ? ` · ${G.reports} survey report${G.reports === 1 ? "" : "s"} to sell on Earth` : ""}</div>
+          ${G.fragments ? `<div class="note">Star-chart tablets found: ${G.fragments}</div>` : ""}</div>
       </div>
       <h3 style="font:20px var(--display);color:var(--brass-hi);margin:18px 0 6px">Standing</h3>
       <table class="t"><tbody>${reps}</tbody></table>
@@ -4066,7 +4885,7 @@ $("btnCaptain").onclick = () => captainScreen();
 $("btnLog").onclick = () => logScreen();
 $("btnOff").onclick = () => officersScreen();
 $("btnMenu").onclick = openMenu;
-$("btnFleet").onclick = () => fleetScreen();
+$("btnFleet").onclick = () => fleetScreen(); $("btnHold").onclick = () => holdingsScreen();
 $("hNet").onclick = () => { if (mode === "map") { NET.back = null; netScreen(); } };
 $("bPause").onclick = openMenu; $("dPause").onclick = openMenu;
 document.querySelectorAll("#dCtl [data-act]").forEach(b => b.addEventListener("pointerdown", e => { e.preventDefault(); if (D && !D.over && !gamePaused) duelAct(D.me, b.dataset.act); }));
