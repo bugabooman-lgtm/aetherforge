@@ -933,7 +933,7 @@ function drawPortrait(cv,b,frame){
 }
 
 // ===================== AETHERFORGE DATA =====================
-const VERSION = "0.33";
+const VERSION = "0.34";
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -1172,7 +1172,7 @@ function ensureV2() {
   if (!G.ship.up) { G.ship.up = noUps(); G.ship.upSpent = 0; }
   if (!G.gid) G.gid = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
   if (G.lastPrize == null) G.lastPrize = Math.floor(G.day);
-  ensureLand();
+  ensureLand(); ensureStory();
   G.v = VERSION;
 }
 const officerAt = post => G.officers.find(o => o.post === post);
@@ -2058,13 +2058,16 @@ function duelFoeName(a) {
   a.capSp = sp; a.capName = (sp === "Human" ? "Captain " : "") + speciesName(sp);
   return a.capName;
 }
-function startDuel(sword, cap) {
-  const a = B.a, m = B.me, f = B.foe;
-  const skill = clamp((a.corsair ? 0.6 : a.role === "navy" ? 0.55 : a.role === "pirate" ? 0.45 : 0.25) + 0.08 * (SHIPS[a.type].size - 1) + 0.02 * G.rank, 0.15, 0.85);
+// o (optional) runs a duel away from a ship battle: { a, crewMe, crewFoe, scene, ends, winLine, loseLine, onEnd(won, d) }
+function startDuel(sword, cap, o) {
+  o = o || {}; const a = o.a || B.a, m = o.a ? { crew: o.crewMe } : B.me, f = o.a ? { crew: o.crewFoe } : B.foe;
+  const skill = a.duelSkill || clamp((a.corsair ? 0.6 : a.role === "navy" ? 0.55 : a.role === "pirate" ? 0.45 : 0.25) + 0.08 * (SHIPS[a.type].size - 1) + 0.02 * G.rank, 0.15, 0.85);
   D = { a, sword: SWORDS[sword], skill, cap, p: 0, cam: 0, t: 0, over: null, overT: 0, crewMe: m.crew, crewFoe: f.crew, crewMe0: m.crew, crewFoe0: f.crew, crewT: 0, adv: 0,
     me: newFighter(), foe: newFighter(), think: 1.1, plan: null, queue: null, msg: "On guard!", msgT: 1.4, shake: 0, sparks: [],
     lookMe: duelLook("player"), lookFoe: duelLook(a), brawl: Array.from({ length: 22 }, (_, i) => ({ side: i % 2, x: rnd(0.08, 0.92), ph: rnd(0, 6), sp: rnd(2.5, 4.5) })) };
-  B.boarded = true; mode = "duel"; $("bhud").hidden = true; $("dhud").hidden = false;
+  Object.assign(D, { scene: o.scene, ends: o.ends, winLine: o.winLine, loseLine: o.loseLine, onEnd: o.onEnd });
+  if (o.a) { $("battle").hidden = false; $("hud").hidden = true; } else B.boarded = true;
+  mode = "duel"; $("bhud").hidden = true; $("dhud").hidden = false;
   $("dMeName").textContent = `${rankOf()} ${G.captain}`; $("dFoeName").textContent = cap;
   duelHud();
 }
@@ -2072,10 +2075,12 @@ const newFighter = () => ({ st: "idle", t: 0, dur: 0, kind: null, rip: 0, off: f
 function duelLook(a) {
   if (a === "player") { const coat = { gb: "#a8322a", de: "#3c4a5c", fr: "#2f4f8f", ru: "#2f6b4a" }[G.nation] || "#a8322a";
     return { coat, trim: "#e8c873", skin: "#e2b48c", pants: "#efe2c4", hat: "cap", hatCol: "#1d1a17", blade: G.sword || "sabre", hair: "#5a3a22", epaulette: G.rank >= 2 }; }
+  if (a.look === "villain") return Object.assign({ pants: "#2a2a2a" }, STORY[G.villain].look);
   if (a.corsair) return { species: "Skarr", coat: "#3a2420", trim: "#c9a14a", skin: "#5e4232", pants: "#2a1d12", hat: "none", hatCol: "#1a120b", blade: "scimitar", hair: "#1a0c08", sash: "#c9a14a", glove: "#3e2a20" };
-  if (a.nat === "mars") return { species: "Ossari", coat: "#6a4a8a", trim: "#e0b45a", skin: "#d9a95a", pants: "#d9a85a", hat: "fez", hatCol: "#8a2a4a", blade: "rapier", hair: "#2a1a10", sash: "#8a2a4a", boot: "#3a2418", glove: "#d9a95a" };
-  if (a.role === "pirate") return { coat: "#2c2622", trim: "#9a3a2a", skin: "#d9a57c", pants: "#5a4a3a", hat: "tricorn", hatCol: "#1d1814", blade: "cutlass", beard: "full", hair: "#1a120b", sash: "#7a2a22", boot: "#2a1a10" };
-  if (a.role === "navy") return { coat: "#1f2c44", trim: "#e8c873", skin: "#e2b48c", pants: "#e3e3df", hat: "cap", hatCol: "#101827", blade: "sabre", beard: "chops", hair: "#6a4a30", epaulette: true };
+  if (a.nat === "mars" && !a.look) return { species: "Ossari", coat: "#6a4a8a", trim: "#e0b45a", skin: "#d9a95a", pants: "#d9a85a", hat: "fez", hatCol: "#8a2a4a", blade: "rapier", hair: "#2a1a10", sash: "#8a2a4a", boot: "#3a2418", glove: "#d9a95a" };
+  const role = a.look || a.role;
+  if (role === "pirate") return { coat: "#2c2622", trim: "#9a3a2a", skin: "#d9a57c", pants: "#5a4a3a", hat: "tricorn", hatCol: "#1d1814", blade: "cutlass", beard: "full", hair: "#1a120b", sash: "#7a2a22", boot: "#2a1a10" };
+  if (role === "navy") return { coat: "#1f2c44", trim: "#e8c873", skin: "#e2b48c", pants: "#e3e3df", hat: "cap", hatCol: "#101827", blade: "sabre", beard: "chops", hair: "#6a4a30", epaulette: true };
   return { coat: "#6b4a2b", trim: "#c9c3b4", skin: "#e2b48c", pants: "#3b3f44", hat: "topper", hatCol: "#222", blade: "rapier", beard: "moustache", hair: "#4a3424", buttons: "#c9a14a" };
 }
 // Background brawlers: the same figures, in the dim colours of their side.
@@ -2157,14 +2162,15 @@ function stepDuel(dt) {
   if (D.crewT > 0.6) { D.crewT = 0; const pm = D.crewMe * (0.75 + G.ship.morale / 200) * (1 + 0.35 * eff("marine")), pf = D.crewFoe * 0.95;
     D.crewMe = Math.max(0, D.crewMe - pf * 0.006 * rnd(0.4, 1.6)); D.crewFoe = Math.max(0, D.crewFoe - pm * 0.006 * rnd(0.4, 1.6)); D.adv = duelAdv(); duelHud(); }
   // endings
-  if (D.p >= DUEL_LEN) duelEnd("win", `${D.cap} is driven to the taffrail and throws down the blade. The ship is yours!`);
-  else if (D.p <= -DUEL_LEN) duelEnd("lose", `${D.cap} beats down your guard and drives you to the rail. You yield.`);
-  else if (D.crewMe < 1 && D.p < 0) duelEnd("lose", `Your last boarders are beaten down around you. ${D.cap} takes your sword.`);
-  else if (D.crewFoe < 1 && D.p > 0) duelEnd("win", `With the last of the crew beaten, ${D.cap} lowers the blade and surrenders the ship.`);
+  if (D.p >= DUEL_LEN) duelEnd("win", D.winLine || `${D.cap} is driven to the taffrail and throws down the blade. The ship is yours!`);
+  else if (D.p <= -DUEL_LEN) duelEnd("lose", D.loseLine || `${D.cap} beats down your guard and drives you to the rail. You yield.`);
+  else if (D.crewMe < 1 && D.p < 0) duelEnd("lose", D.loseLine || `Your last boarders are beaten down around you. ${D.cap} takes your sword.`);
+  else if (D.crewFoe < 1 && D.p > 0) duelEnd("win", D.winLine || `With the last of the crew beaten, ${D.cap} lowers the blade and surrenders the ship.`);
 }
 function duelEnd(result, line) { D.over = result; D.line = line; D.overT = 1.5; duelSay(result === "win" ? "Victory!" : "Beaten!", 2); (result === "win" ? D.foe : D.me).st = "fall"; (result === "win" ? D.foe : D.me).t = 0; duelHud(); }
 function finishDuel() {
   const d = D; D = null; $("dhud").hidden = true; mode = "battle";
+  if (d.onEnd) { $("battle").hidden = true; $("hud").hidden = false; mode = "panel"; return d.onEnd(d.over === "win", d); }
   B.me.crew = Math.max(1, Math.round(d.crewMe)); B.foe.crew = Math.max(1, Math.round(d.crewFoe * (d.over === "win" ? 0.7 : 1)));
   if (d.over === "win") endBattle("boarded", d.line); else { B.me.crew = Math.max(1, Math.round(B.me.crew * 0.5)); endBattle("lost", d.line); }
 }
@@ -2213,14 +2219,22 @@ function drawDuel(t) {
   // sky: the aether, the enemy's funnel and rigging, the nearby world
   c.fillStyle = "#0e131b"; c.fillRect(0, 0, MW, MH);
   for (const st of stars) { c.fillStyle = `rgba(239,226,196,${st.a * 0.8})`; c.fillRect(st.x * MW, st.y * gy, st.s, st.s); }
-  if (B.bg && B.bg.world) { const R = MH * 0.5; c.fillStyle = shade(B.bg.world.col, -0.45); c.beginPath(); c.arc(MW * 0.82, gy + R * 0.55, R, 0, TAU); c.fill(); }
+  const yard = D.scene === "yard";
+  if (!yard && B && B.bg && B.bg.world) { const R = MH * 0.5; c.fillStyle = shade(B.bg.world.col, -0.45); c.beginPath(); c.arc(MW * 0.82, gy + R * 0.55, R, 0, TAU); c.fill(); }
   c.save(); c.translate(sh, 0);
   const ox = MW / 2 - D.cam * step;   // screen x of the middle of the deck
   // distant deck furniture, scrolling at half speed
   const px = MW / 2 - D.cam * step * 0.5;
+  if (yard) {   // a compound wall with lanterns, and the roofs of the town beyond
+    c.fillStyle = "#15120f"; for (const [m, w, h] of [[-560, 150, 190], [-360, 110, 240], [-150, 170, 170], [120, 120, 220], [330, 180, 180], [560, 120, 250]]) { c.fillRect(px + m * s, gy - h * s, w * s, h * s); c.fillRect(px + (m + w * 0.3) * s, gy - (h + 22) * s, 14 * s, 22 * s); }
+    c.fillStyle = "#3a332b"; c.fillRect(-20, gy - 96 * s, MW + 40, 96 * s); c.fillStyle = "#4a4136"; c.fillRect(-20, gy - 100 * s, MW + 40, 6 * s);
+    c.strokeStyle = "rgba(0,0,0,.3)"; c.lineWidth = 1; for (let y = gy - 84 * s; y < gy; y += 14 * s) { c.beginPath(); c.moveTo(0, y); c.lineTo(MW, y); c.stroke(); }
+    for (const m of [-420, -140, 140, 420]) { const lx = px + m * s, ly = gy - 70 * s, lg = c.createRadialGradient(lx, ly, 2, lx, ly, 90 * s); lg.addColorStop(0, "rgba(255,190,110,.5)"); lg.addColorStop(1, "rgba(255,190,110,0)"); c.fillStyle = lg; c.fillRect(lx - 90 * s, ly - 90 * s, 180 * s, 180 * s); c.fillStyle = "#ffd27a"; c.fillRect(lx - 3 * s, ly - 5 * s, 6 * s, 9 * s); }
+  } else {
   c.fillStyle = "#1b1611"; for (const m of [-520, -180, 200, 560]) { c.fillRect(px + m * s - 4 * s, gy - 250 * s, 8 * s, 250 * s); c.fillRect(px + m * s - 60 * s, gy - 205 * s, 120 * s, 4 * s); }
   c.fillStyle = "#231c15"; c.fillRect(px - 60 * s, gy - 150 * s, 46 * s, 150 * s); c.fillRect(px + 320 * s, gy - 130 * s, 40 * s, 130 * s);
   c.strokeStyle = "rgba(201,161,74,.18)"; c.lineWidth = 1; for (const m of [-520, -180, 200, 560]) { c.beginPath(); c.moveTo(px + m * s, gy - 250 * s); c.lineTo(px + (m + 170) * s, gy - 40 * s); c.moveTo(px + m * s, gy - 250 * s); c.lineTo(px + (m - 170) * s, gy - 40 * s); c.stroke(); }
+  }
   // the crews brawling along the far rail, in pairs
   const big = Math.max(D.crewMe0, D.crewFoe0, 1), nMe = Math.ceil(11 * D.crewMe / big), nFoe = Math.ceil(11 * D.crewFoe / big);
   if (!D.cl) D.cl = [crewLook(D.lookMe, 0), crewLook(D.lookFoe, 1)];
@@ -2228,15 +2242,15 @@ function drawDuel(t) {
     if (i < nMe) drawFencer2(c, bx - 20 * s, by, s * 0.5, 1, brawlPose(b0, t), D.cl[0], t);
     if (i < nFoe) drawFencer2(c, bx + 20 * s, by, s * 0.5, -1, brawlPose(b1, t), D.cl[1], t); }
   // far rail
-  c.fillStyle = "#3a2818"; c.fillRect(-20, gy - 46 * s, MW + 40, 5 * s); c.fillStyle = "#2a1d12"; for (let x = ((ox % (38 * s)) + 38 * s) % (38 * s) - 38 * s; x < MW + 40; x += 38 * s) c.fillRect(x, gy - 42 * s, 4 * s, 42 * s);
+  if (!yard) { c.fillStyle = "#3a2818"; c.fillRect(-20, gy - 46 * s, MW + 40, 5 * s); c.fillStyle = "#2a1d12"; for (let x = ((ox % (38 * s)) + 38 * s) % (38 * s) - 38 * s; x < MW + 40; x += 38 * s) c.fillRect(x, gy - 42 * s, 4 * s, 42 * s); }
   // the deck, with its two ends
   const dl = ox - (DUEL_LEN + 2.4) * step, dr = ox + (DUEL_LEN + 2.4) * step;
-  const g = c.createLinearGradient(0, gy - 4, 0, MH); g.addColorStop(0, "#8a6238"); g.addColorStop(1, "#4a3018"); c.fillStyle = g; c.fillRect(dl, gy - 4 * s, dr - dl, MH - gy + 4 * s);
+  const g = c.createLinearGradient(0, gy - 4, 0, MH); g.addColorStop(0, yard ? "#6a6258" : "#8a6238"); g.addColorStop(1, yard ? "#2e2a26" : "#4a3018"); c.fillStyle = g; c.fillRect(dl, gy - 4 * s, dr - dl, MH - gy + 4 * s);
   c.strokeStyle = "rgba(30,18,8,.4)"; c.lineWidth = 1.2; for (let i = 1; i < 6; i++) { const y = gy + (MH - gy) * (i / 6) ** 1.5; c.beginPath(); c.moveTo(dl, y); c.lineTo(dr, y); c.stroke(); }
   for (let x = dl; x < dr; x += 90 * s) { c.beginPath(); c.moveTo(x, gy - 4 * s); c.lineTo(x - (x - MW / 2) * 0.25, MH); c.stroke(); }
-  c.fillStyle = "#c9a14a"; c.fillRect(dl, gy - 6 * s, dr - dl, 3 * s);
-  c.fillStyle = "#0e131b"; c.fillRect(-40, gy - 6 * s, dl + 40, MH); c.fillRect(dr, gy - 6 * s, MW - dr + 40, MH);
-  for (const [ex, lab] of [[dl, "Your rail"], [dr, "Her taffrail"]]) { c.fillStyle = "#5c4416"; c.fillRect(ex - 4 * s, gy - 60 * s, 8 * s, 60 * s); c.fillStyle = "#c9a14a"; c.beginPath(); c.arc(ex, gy - 62 * s, 6 * s, 0, TAU); c.fill();
+  c.fillStyle = yard ? "#8a8274" : "#c9a14a"; c.fillRect(dl, gy - 6 * s, dr - dl, 3 * s);
+  c.fillStyle = yard ? "#0c0b0a" : "#0e131b"; c.fillRect(-40, gy - (yard ? 100 : 6) * s, dl + 40, MH); c.fillRect(dr, gy - (yard ? 100 : 6) * s, MW - dr + 40, MH);
+  for (const [ex, lab] of [[dl, D.ends ? D.ends[0] : "Your rail"], [dr, D.ends ? D.ends[1] : "Her taffrail"]]) { c.fillStyle = "#5c4416"; c.fillRect(ex - 4 * s, gy - 60 * s, 8 * s, 60 * s); c.fillStyle = "#c9a14a"; c.beginPath(); c.arc(ex, gy - 62 * s, 6 * s, 0, TAU); c.fill();
     c.fillStyle = "rgba(239,226,196,.7)"; c.font = `${Math.round(13 * Math.max(1, s))}px "Alegreya Sans", system-ui, sans-serif`; c.textAlign = "center"; c.fillText(lab, ex, gy - 76 * s); }
   // the captains
   const cx = ox + D.p * step, gap = 46 * s, fy = gy + 30 * s;
@@ -2739,6 +2753,12 @@ function confirmCloud(back) {
 // ===================== TITLE, PAUSE MENU, MANUAL, CHANGELOG, ABOUT (0.26) =====================
 // Spoiler-free changelog, newest first.
 const CHANGELOG = [
+  { v: "0.34", items: [
+    "The hunt begins. Buy a round in a public house and ask after your nemesis to learn who does their work, and where.",
+    "Each villain has three lieutenants of their own. Beat one and the captain's papers tell you where one of your family is held, and who to hunt next.",
+    "Free your family by paying, by appealing to a governor who respects you, or by breaking them out at night, sword in hand.",
+    "Beat the last lieutenant to learn where your nemesis is hiding, then sail there and finish it. Meanwhile they send hunters after you.",
+    "A journal, The hunt, on the Captain screen keeps track of what you know and what to do next. Voyages already under way join the story where they are." ] },
   { v: "0.33", items: [
     "Martian nobles in boarding duels are now Ossari, and corsair captains are Skarr, drawn from their portraits. Their crews match.",
     "Duellists parry and thrust with a straight arm, and elbows bend the natural way.",
@@ -2916,6 +2936,23 @@ const MANUAL = [
     <p>Meanwhile the crews fight behind you. The bar at the top shows who is winning; the side with the upper hand lends its captain speed. A <b>taunt</b> heartens your crew, but leaves you open. The sabre is balanced, the rapier quicker with a shorter guard, the cutlass slower but harder-hitting.</p>
     <h3>Prizes</h3>
     <p>A captured ship gives up her gold, some of her crew and her cargo. You can add her to your fleet or make her your flagship. If you lose your flagship, your best remaining ship takes over; with no fleet, you'll be put ashore poorer but alive.</p>` },
+  { t: "The Hunt", h: `
+    <p>Somebody ruined your family, and you chose who at the start of the voyage. The hunt for them runs alongside everything else you do, at your own pace. <b>Captain</b>, then <b>The hunt</b>, opens a journal that always says what to do next.</p>
+    <h3>Finding the lieutenants</h3>
+    <p>Your nemesis works through three <b>lieutenants</b>, each with a ship. In any public house you can <b>buy a round and ask</b>. If nobody there knows, they will tell you which world to try; on the right world, somebody always talks.</p>
+    <p>Once you have a name, the lieutenant's ship is marked on the chart with a red ring, and the journal can <b>set a course</b> for her. They are hostile on sight, and each is stronger than the last, so build up your ship before you go looking.</p>
+    <h3>The papers</h3>
+    <p>Beat a lieutenant, by taking or sinking the ship, and you get the captain's <b>papers</b>. Each set tells you where one of your <b>family</b> is held, and names the next lieutenant.</p>
+    <h3>Freeing your family</h3>
+    <p>Make port where one of them is held and a card appears at the top of the port screen. There are three ways:</p>
+    <ul>
+      <li><b>Pay</b> the price asked. Each costs more than the last.</li>
+      <li><b>Appeal</b> to the governor or prince, who will listen only if you are respected there.</li>
+      <li><b>Break them out by night</b>: a sword fight against the captain of the guard, with your landing party at your back. Win or lose, that port will think the worse of you.</li>
+    </ul>
+    <h3>The reckoning</h3>
+    <p>The last lieutenant's papers give away your nemesis's <b>stronghold</b>, which is then marked on the chart. Their flagship is an ironclad frigate with a full crew, and they are the best sword you will meet.</p>
+    <p class="note">After the first lieutenant falls, your nemesis sends <b>hired hunters</b> after you from time to time. They show on the chart with a red ring.</p>` },
   { t: "Landings", h: `
     <p>Every world can be landed on. Sail close and choose <b>Land</b> from the list at the bottom of the chart, or tap the world itself. Days pass while you are ashore, and the crew still eats.</p>
     <h3>Sites and surveys</h3>
@@ -3691,6 +3728,287 @@ function explorer(c, x, y, k, suit, lead, rifle, hurt) {
   if (lead) { c.strokeStyle = "#2a1d12"; c.lineWidth = 1 * k; c.beginPath(); c.moveTo(x + 4 * k, y - 14 * k); c.lineTo(x + 8 * k, y - 15 * k); c.stroke(); c.fillStyle = "#ffd27a"; c.fillRect(x + 7 * k, y - 15 * k, 2.4 * k, 3.4 * k); }
 }
 
+// ===================== THE HUNT (0.34) =====================
+// The villain storyline. Ask after your nemesis in public houses to find their lieutenants;
+// beat each lieutenant for papers that say where one of your family is held and who to hunt
+// next; free your family; and when the last lieutenant falls, sail for the stronghold itself.
+
+const STORY = {
+  crane: { short: "Crane", agents: "Crane's relic-hunters", nat: "pirate",
+    lts: [
+      { n: "Dr. Augustus Pell", ship: "Trilobite", type: "gunboat", body: "mars", look: "merchant", does: "strips the dead canal cities for anything with the old writing on it" },
+      { n: "Captain Mirela Voss", ship: "Sextant", type: "cruiser", body: "venus", look: "navy", does: "carries Crane's finds between the worlds and sinks anyone who looks too closely" },
+      { n: "Major Lucius Thorne", ship: "Gnomon", type: "cruiser", body: "ceres", look: "navy", does: "guards the lanes to Crane's hiding place in the belt" } ],
+    held: ["neubremen", "arkhangelsk", "hermes"],
+    heldAs: ["indentured to a rubber plantation", "indentured to a canal-dredging gang", "indentured to the quicksilver works"],
+    hold: { name: "Crane's Orrery", body: "vesta", what: "a private observatory bolted to a rock in the belt" },
+    flag: { ship: "Perihelion", type: "frigate" },
+    look: { coat: "#4a4f58", trim: "#c9c3b4", skin: "#e0b592", pants: "#2b2e33", hat: "topper", hatCol: "#1c1c20", blade: "rapier", beard: "chops", hair: "#b9b4aa", buttons: "#c9a14a" },
+    end: "Crane is dragged from the wreck of his instruments, still shouting that he was within a month of the greatest discovery in history. In his cabin you find your father's notebooks, every page of them, and the artifacts stolen from the Royal Society. The Society's own seal is on the crate. Nobody can call your father a thief now." },
+  adler: { short: "von Adler", agents: "the Adler Line's hired captains", nat: "de",
+    lts: [
+      { n: "Kapitän Dieter Brandt", ship: "Hansa", type: "gunboat", body: "venus", look: "navy", does: "escorts her rubber convoys and sinks independent traders" },
+      { n: "Mrs. Honoria Slate", ship: "Dividend", type: "cruiser", body: "mars", look: "merchant", does: "buys judges and insurers, and keeps the ledgers that prove it" },
+      { n: "Kapitän Wolf Reuter", ship: "Greif", type: "cruiser", body: "ceres", look: "navy", does: "holds the Vorrn apergy contract at gunpoint" } ],
+    held: ["lumiere", "marseille", "ceres"],
+    heldAs: ["indentured to a rubber plantation to pay the family's debts", "indentured to a silk house to pay the family's debts", "indentured to a mining concession to pay the family's debts"],
+    hold: { name: "the Adlerhorst", body: "venus", what: "her private dock high above the clouds of Venus" },
+    flag: { ship: "Schwarzer Adler", type: "frigate" },
+    look: { coat: "#1f4a3a", trim: "#e8c873", skin: "#ecc7a6", pants: "#22282a", hat: "topper", hatCol: "#16201c", blade: "rapier", hair: "#d9b96a", buttons: "#e8c873" },
+    end: "The Baroness hands you her sword hilt-first, as if conferring a favour. Her strongroom is less gracious: the bought debts, the bribed insurers, the order that sent your father's last ship into the squall, all in her own hand. The courts of four empires will want to read them, and the Vorrn of Ceres will want their contract back." },
+  graves: { short: "Graves", agents: "Graves's captains", nat: "pirate",
+    lts: [
+      { n: "Bloody Tom Carver", ship: "Gallows Moon", type: "gunboat", body: "deimos", look: "pirate", does: "collects Graves's tribute from every ship that uses the Deimos roads" },
+      { n: "Black Ada Moreau", ship: "Widow's Lantern", type: "kite", body: "pallas", look: "pirate", does: "keeps Graves's hostages, and the keys" },
+      { n: "Sailing-Master Ezekiel Crowe", ship: "Dead Reckoning", type: "cruiser", body: "ceres", look: "pirate", does: "is the only pilot who knows the way into Graves's haven" } ],
+    held: ["deimos", "pallas", "ceres"],
+    heldAs: ["held hostage in the cellars of the haven", "held hostage aboard a prison hulk", "held hostage, and put to work in the chandlery"],
+    hold: { name: "Graves's Deep", body: "juno", what: "a pirate haven hidden in the wreckage of Phaeton" },
+    flag: { ship: "Revenant", type: "frigate" },
+    look: { coat: "#17191f", trim: "#c9a14a", skin: "#dcb190", pants: "#d8d8d2", hat: "cap", hatCol: "#0c0e13", blade: "sabre", beard: "chops", hair: "#3a3a3a", epaulette: true },
+    end: "Graves is taken alive, which he plainly did not expect. In his cabin are the log of your father's survey ship, the receipt the pirates gave him for her, and the chart from the vault. The Admiralty will have to melt down a great many medals." },
+  kathuun: { short: "Ka'Thuun", agents: "Ka'Thuun's warlords", nat: "mars",
+    lts: [
+      { n: "Warlord Grakk Bloodcrest", ship: "Dune Wraith", type: "kite", body: "mars", corsair: true, does: "raids the colonial lanes in the prince's name" },
+      { n: "Warlord Skoll Ironjaw", ship: "Steppe Hawk", type: "kite", body: "deimos", corsair: true, does: "runs the prince's guns out of Deimos Roads" },
+      { n: "Vizier Oon-Tavi", ship: "Canal Serpent", type: "cruiser", body: "mars", does: "keeps the prince's tribute rolls, and the names of every servant taken" } ],
+    held: ["thothka", "deimos", "syrtis"],
+    heldAs: ["taken as tribute, a servant in an allied prince's household", "taken as tribute, and put to work for the gun-runners", "taken as tribute, hidden in the old quarter under the governor's nose"],
+    hold: { name: "the War Camp of Ka-Resh", body: "mars", what: "his war camp among the dead cities, with his sky-galleon riding above it" },
+    flag: { ship: "Wrath of Syrtis", type: "frigate" },
+    look: { species: "Ossari", coat: "#b8862a", trim: "#f0d890", skin: "#d9a95a", pants: "#6a4a8a", hat: "fez", hatCol: "#2a2a6a", blade: "scimitar", sash: "#8a2a4a", glove: "#d9a95a", boot: "#3a2418" },
+    end: "The prince yields with great dignity, and asks only that his people not be made to watch. In his chests are the canal priests' archives with your father's translations, and the temple-keeper's sworn account of who truly defiled the shrine. Read out in the bazaars, it will end his war before it begins." }
+};
+const FAMILY_NAMES = { gb: ["Eleanor", "Charlotte", "Edmund"], de: ["Margarethe", "Liesel", "Karl"], fr: ["Hélène", "Colette", "Julien"], ru: ["Yelena", "Katya", "Mikhail"] };
+const KIN = ["mother", "sister", "brother"];
+const STORY_COST = [500, 900, 1400];
+
+function ensureStory() {
+  if (!G || !STORY[G.villain]) return;
+  if (!G.story) { const sur = G.captain.trim().split(/\s+/).slice(-1)[0], f = FAMILY_NAMES[G.nation] || FAMILY_NAMES.gb;
+    G.story = { lts: [0, 1, 2].map(() => ({ known: false, done: false })), named: 0, kin: KIN.map((k, i) => ({ name: `${f[i]} ${sur}`, known: false, free: false })), hold: false, won: false, nextHunter: 0, notes: [] }; }
+  storyRespawn();
+}
+const SV = () => STORY[G.villain], vName = () => VILLAINS[G.villain].n;
+const aShip = t => (/^[aeiou]/.test(shipWord(t)) ? "an " : "a ") + shipWord(t);
+const atBody = id => (PLANETS.some(p => p.id === id) || id === "moon" ? "on " : "at ") + bodyName(id);
+const kinWord = i => `your ${KIN[i]}`;
+const storyNext = () => G.story.lts.findIndex(l => !l.done);            // the lieutenant you are hunting now (-1 when all are beaten)
+const storyAi = i => G.ais.find(a => a.agent && a.story === i);
+function storyNote(t) { G.story.notes.unshift({ d: Math.floor(G.day), t }); logMsg(t); }
+
+// ---------- the villain's ships ----------
+function spawnAgent(i) {
+  const V = SV(), flag = i === 3, L = flag ? { n: vName(), ship: V.flag.ship, type: V.flag.type, body: V.hold.body } : V.lts[i];
+  const b = bodyPos(L.body, G.day), ang = rnd(0, TAU), r = bodySize(L.body) + rnd(50, 90), s = SHIPS[L.type];
+  G.ais.push({ id: G.nextAi++, nat: V.nat, role: "pirate", type: L.type, from: "ceres", dest: "ceres", x: b.x + Math.cos(ang) * r, y: b.y + Math.sin(ang) * r, h: ang,
+    gold: flag ? 5000 : [900, 1600, 2400][i], cargo: flag ? { relics: 6, apergy: 8 } : { [pickOne(["firearms", "machinery", "spice", "amber"])]: 10 + i * 4 },
+    name: L.ship, hull: Math.round(s.hull * (flag ? 1.25 : 1)), vanes: s.vanes, crew: Math.round(s.crew * (flag ? 1 : 0.85)), chasing: false, wander: 0, corsair: !!L.corsair,
+    agent: true, story: i, home: L.body, capName: L.n, capSp: L.corsair ? "Skarr" : V.look.species && (flag || !L.look) ? "Ossari" : "Human", look: flag ? "villain" : L.look, duelSkill: flag ? 0.8 : 0.45 + i * 0.1 });
+}
+function spawnHunter() {
+  const V = SV(), st = G.story, n = st.lts.filter(l => l.done).length, me = G.ship, ang = rnd(0, TAU), type = ["gunboat", "gunboat", "cruiser", "cruiser"][n], s = SHIPS[type];
+  G.ais.push({ id: G.nextAi++, nat: V.nat, role: "pirate", type, from: "ceres", dest: "ceres", x: me.x + Math.cos(ang) * 190 * WORLD, y: me.y + Math.sin(ang) * 190 * WORLD, h: ang + Math.PI,
+    gold: ri(300, 700), cargo: { provisions: 8 }, name: pickOne(["Bloodhound", "Long Memory", "Paid in Full", "Creditor", "Last Word", "Patient Knife"]), hull: s.hull, vanes: s.vanes, crew: Math.round(s.crew * 0.8),
+    chasing: true, wander: 3, corsair: G.villain === "kathuun", agent: true, hunter: true, look: G.villain === "adler" ? "navy" : "pirate" });
+  toast(`A strange sail is following you. Word is that ${V.agents} have put a price on your head.`, 5200);
+}
+// Keep the ships the story needs in existence (after loading, or if one is lost some other way).
+function storyRespawn() {
+  const st = G.story; if (!st || st.won) return;
+  st.lts.forEach((l, i) => { if (l.known && !l.done && !storyAi(i)) spawnAgent(i); });
+  if (st.hold && !storyAi(3)) spawnAgent(3);
+}
+function storyDaily() {
+  const st = G.story; if (!st || st.won) return;
+  storyRespawn();
+  const n = st.lts.filter(l => l.done).length;
+  if (n >= 1 && !G.docked && !G.landed && G.day >= st.nextHunter) {
+    st.nextHunter = G.day + rnd(45, 80);
+    if (!G.ais.some(a => a.hunter)) spawnHunter();
+  }
+}
+function agentLabel(a) { const V = SV(); return a.hunter ? `hired hunter ${shipWord(a.type)}` : a.story === 3 ? `flagship of ${vName()}` : `${shipWord(a.type)} of ${V.agents}`; }
+
+// ---------- leads: asking in the public houses ----------
+function storyAsk(p) {
+  const st = G.story, V = SV(), i = storyNext(), v = vName();
+  if (st.won) return `They are still telling the story of how you finished ${v}. You don't pay for your own drinks tonight.`;
+  if (i < 0) return st.hold ? `Everyone knows where ${v} is now: ${V.hold.what}, off ${bodyName(V.hold.body)}. Nobody who went looking has come back.` : "Nobody has anything new to tell you.";
+  const L = V.lts[i], l = st.lts[i], here = p.body === L.body || (MINOR[p.body] && MINOR[p.body].parent === L.body) || (MINOR[L.body] && MINOR[L.body].parent === p.body);
+  if (l.known) { const a = storyAi(i); return `${L.n} and the ${L.ship}? ${a ? `Seen off ${bodyName(L.body)} not three days ago.` : "Gone quiet, lately."} Mind yourself, Captain. That one shoots first.`; }
+  if (i > st.named) return "Nobody has anything new to tell you.";
+  if (here || Math.random() < 0.3 + (G.skill === "charm" ? 0.2 : 0)) {
+    l.known = true; spawnAgent(i);
+    storyNote(`Learned that ${L.n} of the ${L.ship} works for ${v} near ${bodyName(L.body)}.`);
+    return `You want ${L.n}. Commands the ${L.ship}, ${aShip(L.type)}, and ${L.does}. Works the lanes around ${bodyName(L.body)}. And you never heard it from me.`;
+  }
+  return `${v}? Keep your voice down. I don't know the name, and I don't want to. But if I were asking, I'd ask ${atBody(L.body)}.`;
+}
+
+// ---------- beating a lieutenant, or the villain ----------
+function storyAgentBeaten(a, result, done) {
+  const st = G.story, V = SV(), i = a.story, v = vName();
+  if (a.hunter || i == null) return done();
+  mode = "panel";
+  if (i === 3) {   // the villain
+    st.won = true; const stillHeld = st.kin.filter(k => !k.free); stillHeld.forEach(k => k.known = true);
+    const reward = 3000; G.gold += reward; G.fame += 60; G.rep[G.nation] = clamp(G.rep[G.nation] + 30, -100, 100); G.ship.morale = 100; G.fragments = (G.fragments || 0) + 1;
+    storyNote(`Defeated ${v} at ${V.hold.name}. The family name is cleared.`);
+    showPanel(`<header><div><h2 id="pTitle">The reckoning</h2><div class="tag">${esc(V.hold.name)} · ${dateStr(G.day)}</div></div></header>
+      <div class="body"><canvas class="scene wide" id="stPort"></canvas><div class="prose">
+        <p>${result === "sunk" ? `The ${esc(a.name)} breaks her back and settles, and your boats pull one last survivor from the wreckage. ` : ""}${esc(V.end)}</p>
+        <p>${stillHeld.length ? `Among the papers are the places where ${stillHeld.map(k => esc(k.name)).join(" and ")} ${stillHeld.length > 1 ? "are" : "is"} still held. Nobody will dare refuse you now.` : "Your family is free, every one of them, and the name they carry is clean again."}</p>
+        <p>The ${NATIONS[G.nation].name} sends ${fmtGold(reward)} and its thanks. And at the bottom of the last chest lies the thing all of this was for: a chart, in the old writing, of <b>the far side of the Moon</b>.</p>
+        <p class="note">That voyage belongs to a later version. Until then the aether is yours.</p></div></div>
+      <footer><button class="b main" id="stOk" autofocus><span class="key">↵</span>Carry on</button></footer>`, e => { if (e.key === "Enter") $("stOk").click(); });
+    villainPortrait($("stPort")); $("stOk").onclick = () => { save(); done(); }; return;
+  }
+  const l = st.lts[i], L = V.lts[i], k = st.kin[i], hp = PORT[V.held[i]], last = i === 2;
+  l.done = true; k.known = true; st.named = Math.max(st.named, i + 1); G.fame += 12; st.nextHunter = Math.max(st.nextHunter, G.day + 20);
+  if (last) st.hold = true;
+  const nx = last ? null : V.lts[i + 1];
+  storyNote(`Beat ${L.n}. ${k.name} is held at ${hp.name}.`);
+  if (last) { spawnAgent(3); storyNote(`${v} is at ${V.hold.name}, off ${bodyName(V.hold.body)}.`); }
+  showPanel(`<header><div><h2 id="pTitle">${esc(L.n)}'s papers</h2><div class="tag">${result === "sunk" ? "Fished from the wreckage" : `Found in the cabin of the ${esc(a.name)}`}</div></div></header>
+    <div class="body"><div class="prose">
+      <p>${result === "sunk" ? "A dispatch box floats clear of the wreck." : `${esc(L.n)} gives up the key to a dispatch box with very bad grace.`} Inside are letters in ${esc(v)}'s own hand, and among them a bill of ${G.villain === "graves" ? "ransom" : G.villain === "kathuun" ? "tribute" : "indenture"}.</p>
+      <p><b>${esc(k.name)}</b>, ${kinWord(i)}, is alive: ${esc(V.heldAs[i])} at <b>${esc(hp.name)}</b>.</p>
+      <p>${last ? `The last letter is an order to bring supplies to <b>${esc(V.hold.name)}</b>: ${esc(V.hold.what)}, off ${esc(bodyName(V.hold.body))}. ${esc(v)} is there, aboard the ${esc(V.flag.ship)}. It is marked on your chart.`
+        : `The letters also name another of ${esc(v)}'s people: <b>${esc(nx.n)}</b>, somewhere near ${esc(bodyName(nx.body))}. The public houses there will know more.`}</p>
+      <p class="note">The hunt is written up in your journal (Captain, then The hunt).</p></div></div>
+    <footer><button class="b main" id="stOk" autofocus><span class="key">↵</span>Carry on</button></footer>`, e => { if (e.key === "Enter") $("stOk").click(); });
+  $("stOk").onclick = () => { save(); done(); };
+}
+function villainPortrait(cv) {   // the villain, sword lowered, against the lamplight
+  if (!cv) return; const dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth || 320, H = cv.clientHeight || 170;
+  cv.width = W * dpr; cv.height = H * dpr; const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = "#14100c"; c.fillRect(0, 0, W, H); const g = c.createRadialGradient(W / 2, H * 0.55, 6, W / 2, H * 0.55, W * 0.5); g.addColorStop(0, "rgba(255,190,110,.45)"); g.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  c.fillStyle = "#3a2818"; c.fillRect(0, H * 0.86, W, H * 0.14); c.fillStyle = "#c9a14a"; c.fillRect(0, H * 0.86, W, 2);
+  const s = H / 125;
+  drawFencer2(c, W / 2 - 46 * s, H * 0.9, s, 1, { st: "idle", t: 0, dur: 1 }, duelLook("player"), 0);
+  drawFencer2(c, W / 2 + 46 * s, H * 0.9, s, -1, { st: "stun", t: 0.35, dur: 0.5 }, duelLook({ look: "villain", agent: true }), 0);
+}
+
+// ---------- freeing your family ----------
+function storyPortCard(p) {
+  const st = G.story, V = SV(); if (!st || !$("portBody")) return;
+  const i = V.held.indexOf(p.id); if (i < 0) return; const k = st.kin[i]; if (!k.known || k.free) return;
+  const cost = STORY_COST[i], great = GREAT.includes(p.nat), rep = p.nat === "mars" ? G.rep.mars : great ? G.rep[p.nat] : null, favour = rep != null && (rep >= 40 || st.won || (p.nat === "mars" && G.writ));
+  const who = great ? "the governor" : p.nat === "mars" ? "the prince" : null, word = G.villain === "graves" ? "ransom" : G.villain === "kathuun" ? "tribute-price" : "indenture";
+  const d = document.createElement("div"); d.className = "card"; d.style.cssText = "margin-bottom:14px;border-color:var(--brass-hi)";
+  d.innerHTML = `<h3>${esc(k.name)} is here</h3><p class="note" style="color:var(--parch)">${kinWord(i).charAt(0).toUpperCase() + kinWord(i).slice(1)}, ${esc(V.heldAs[i])}.</p>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
+      <button class="b sm main" id="skBuy"${G.gold >= cost ? "" : " disabled"}>Pay the ${word} · ${fmtGold(cost)}</button>
+      ${who ? `<button class="b sm" id="skAsk"${favour ? "" : " disabled"}>Appeal to ${who}</button>` : ""}
+      <button class="b sm" id="skRaid">Break ${KIN[i] === "brother" ? "him" : "her"} out by night</button></div>
+    <p class="note" style="margin-bottom:0">${who ? `${who.charAt(0).toUpperCase() + who.slice(1)} will only listen to a captain who is respected here. ` : ""}A break-out means a fight with the guard, and it won't be forgiven quickly.</p>`;
+  $("portBody").prepend(d);
+  d.addEventListener("click", e => e.stopPropagation());   // the market re-draws the port on any click that reaches it
+  $("skBuy").onclick = () => { if (G.gold < cost) return; G.gold -= cost; storyFree(p, i, `You count out ${fmtGold(cost)} on the overseer's desk. He signs the release without looking up.`); };
+  if ($("skAsk")) $("skAsk").onclick = () => { if (!favour) return; storyFree(p, i, `${who.charAt(0).toUpperCase() + who.slice(1)} hears you out, sends for the papers, and tears them across. "A disgraceful business, Captain. Take ${KIN[i] === "brother" ? "him" : "her"} home."`); };
+  $("skRaid").onclick = () => storyRaid(p, i);
+}
+function storyFree(p, i, how) {
+  const st = G.story, k = st.kin[i], left = st.kin.filter(x => !x.free).length - 1;
+  k.free = true; G.fame += 10; G.ship.morale = clamp(G.ship.morale + 20, 0, 100);
+  storyNote(`Freed ${k.name} at ${p.name}.`);
+  const says = [`"I knew you by your walk before I saw your face. Your father used to say you'd be the one to come."`, `"You took your time! No, don't look like that. I'd have waited twice as long."`, `"They told us you were dead. I never believed a word any of them said, and I was right."`][i];
+  mode = "panel";
+  showPanel(`<header><div><h2 id="pTitle">${esc(k.name)}</h2><div class="tag">${esc(p.name)} · ${dateStr(G.day)}</div></div></header>
+    <div class="body"><div class="prose"><p>${esc(how)}</p><p>${says}</p>
+      <p>${left > 0 ? `You find ${KIN[i] === "brother" ? "him" : "her"} a berth on the next packet home, with money for the journey. ${left === 1 ? "One more" : `${left} more`} of your family ${left === 1 ? "is" : "are"} still out there.` : st.won ? "That is the last of them. Your family is whole again, and its name is clean." : `That is the last of them. Only ${esc(vName())} remains.`}</p>
+      <p class="note">The crew cheer you both aboard. Morale rises.</p></div></div>
+    <footer><button class="b main" id="stOk" autofocus><span class="key">↵</span>Carry on</button></footer>`, e => { if (e.key === "Enter") $("stOk").click(); });
+  $("stOk").onclick = () => { save(); openPort(p.id); };
+}
+// A night raid: your landing party against the guard, and you against their captain.
+function storyRaid(p, i) {
+  const st = G.story, k = st.kin[i], party = Math.min(20, G.ship.crew - 4);
+  if (party < 6) return toast("You need at least ten hands aboard to try it.");
+  const last = G.sword || "sabre";
+  showPanel(`<header><div><h2 id="pTitle">By night</h2><div class="tag">${esc(p.name)}</div></div></header>
+    <div class="body"><div class="prose"><p>${party} picked hands, boat-cloaks and muffled oars. The compound where ${esc(k.name)} is held has one gate, and the captain of the guard sleeps beside it, sword to hand.</p>
+      <p class="note">Drive the captain back across the yard to the wall and the gate is yours. Lose, and you'll be lucky to reach the boats. Choose your sword.</p></div>
+      <div class="choices">${Object.entries(SWORDS).map(([key, s], n) => `<button class="choice" data-sword="${key}" aria-pressed="${key === last}"><b><span class="key">${"ZXC"[n]}</span>${s.n}</b><span>${s.d}</span></button>`).join("")}</div></div>
+    <footer><button class="b" id="srBack">Think again</button></footer>`,
+    e => { const key = e.key.toLowerCase(), n = "zxc".indexOf(key); if (n >= 0) go(Object.keys(SWORDS)[n]); else if (key === "escape") openPort(p.id); });
+  const go = sw => { G.sword = sw; closePanel(); const guard = { type: "sloop", role: "navy", nat: GREAT.includes(p.nat) ? p.nat : "pirate", look: GREAT.includes(p.nat) ? "navy" : p.nat === "mars" ? null : "pirate", corsair: p.nat === "mars", agent: true, name: p.name, duelSkill: 0.35 + i * 0.1,
+      capName: p.nat === "mars" ? speciesName("Skarr") : "Captain " + speciesName("Human"), capSp: p.nat === "mars" ? "Skarr" : "Human" };
+    startDuel(sw, guard.capName, { a: guard, crewMe: party, crewFoe: 12 + i * 5, scene: "yard", ends: ["The gate", "The wall"],
+      winLine: `${guard.capName} is backed against the wall and drops the sword. The gate is yours.`, loseLine: `${guard.capName} beats you back through the gate. The alarm bell is ringing.`,
+      onEnd: (won, d) => { const lost = Math.max(0, Math.round(party - d.crewMe)); G.ship.crew = Math.max(4, G.ship.crew - lost);
+        if (GREAT.includes(p.nat) || p.nat === "mars") G.rep[p.nat] = clamp(G.rep[p.nat] - (won ? 15 : 8), -100, 100); else G.rep.pirate = clamp(G.rep.pirate - 8, -100, 100);
+        if (won) return storyFree(p, i, `The guard throw down their arms. You find ${k.name} in the third hut along, already dressed and waiting, having heard the swords.${lost ? ` It cost you ${lost} hands.` : ""}`);
+        G.ship.morale = clamp(G.ship.morale - 10, 0, 100); logMsg(`A raid to free ${k.name} at ${p.name} failed.`); mode = "panel";
+        showPanel(`<header><h2 id="pTitle">Driven off</h2></header><div class="body"><div class="prose"><p>You reach the boats with the guard's shots splashing round you${lost ? `, ${lost} hands short` : ""}. ${esc(k.name)} is still inside, and now they know you are coming.</p></div></div>
+          <footer><button class="b main" id="stOk" autofocus>Back to the ship</button></footer>`, e => { if (e.key === "Enter") $("stOk").click(); });
+        $("stOk").onclick = () => { save(); openPort(p.id); }; } }); };
+  panel.querySelectorAll("[data-sword]").forEach(b => b.onclick = () => go(b.dataset.sword));
+  $("srBack").onclick = () => openPort(p.id);
+}
+
+// ---------- the journal ----------
+function storyScreen(back) {
+  const st = G.story, V = SV(), v = VILLAINS[G.villain], cur = storyNext();
+  back = typeof back === "function" ? back : () => { closePanel(); resumeMap(); };
+  const lt = V.lts.map((L, i) => { const l = st.lts[i], a = storyAi(i);
+    if (l.done) return `<tr><td><b>${esc(L.n)}</b><div class="note">The ${esc(L.ship)}</div></td><td>Beaten</td><td></td></tr>`;
+    if (l.known) return `<tr><td><b>${esc(L.n)}</b><div class="note">The ${esc(L.ship)}, ${aShip(L.type)}. ${esc(L.does.charAt(0).toUpperCase() + L.does.slice(1))}.</div></td><td>${a ? `Off ${esc(bodyName(L.body))}` : "Whereabouts unknown"}</td><td class="r">${a && mode !== "port" && !G.docked ? `<button class="b sm" data-go="${a.id}">Set course</button>` : ""}</td></tr>`;
+    if (i <= st.named) return `<tr><td><b>${i === 0 ? "Somebody" : esc(L.n)}</b><div class="note">${i === 0 ? `${esc(v.n)} does nothing in person. Find out who does the work.` : `Named in the last one's papers. Somewhere near ${esc(bodyName(L.body))}.`}</div></td><td>Ask in the public houses${i ? ` ${esc(atBody(L.body))}` : ""}</td><td></td></tr>`;
+    return `<tr><td class="note">Another, not yet named</td><td></td><td></td></tr>`; }).join("");
+  const kin = st.kin.map((k, i) => `<tr><td><b>${esc(k.name)}</b><div class="note">Your ${KIN[i]}</div></td><td>${k.free ? `<span style="color:var(--good)">Free, and gone home</span>` : k.known ? `Held at <b>${esc(PORT[V.held[i]].name)}</b><div class="note">${esc(V.heldAs[i].charAt(0).toUpperCase() + V.heldAs[i].slice(1))}</div>` : "Whereabouts unknown"}</td></tr>`).join("");
+  const fa = storyAi(3);
+  const now = st.won ? (st.kin.some(k => !k.free) ? "Bring the rest of your family home." : "Your hunt is over. The chart of the Moon's far side is waiting.")
+    : cur < 0 ? `Sail for ${V.hold.name} and finish it. Go well armed: the ${V.flag.ship} is an ironclad frigate.`
+    : st.lts[cur].known ? `Find the ${V.lts[cur].ship} and beat her. Her captain's papers are what you need.` : `Buy a round in a public house and ask after ${v.n}'s people${cur ? `, ${atBody(V.lts[cur].body)} for choice` : ""}.`;
+  showPanel(`<header><div><h2 id="pTitle">The hunt</h2><div class="tag">${esc(v.n)} · ${esc(v.d)}</div></div></header>
+    <div class="body"><div class="prose"><p>${esc(v.story)}</p><p style="color:var(--brass-hi)"><b>Next:</b> ${esc(now)}</p></div>
+      <h3 style="font:20px var(--display);color:var(--brass-hi);margin:14px 0 4px">${esc(v.n.split(" ").slice(-1)[0] === "Syrtis" ? "The prince" : v.n.split(" ").slice(-1)[0])}'s people</h3>
+      <div style="overflow-x:auto"><table class="t"><tbody>${lt}
+        <tr><td><b>${esc(v.n)}</b><div class="note">${st.hold ? `Aboard the ${esc(V.flag.ship)} at ${esc(V.hold.name)}: ${esc(V.hold.what)}.` : "Hidden. Only the last of the lieutenants knows where."}</div></td><td>${st.won ? "Beaten" : st.hold ? `Off ${esc(bodyName(V.hold.body))}` : "Unknown"}</td><td class="r">${fa && !st.won && !G.docked ? `<button class="b sm" data-go="${fa.id}">Set course</button>` : ""}</td></tr></tbody></table></div>
+      <h3 style="font:20px var(--display);color:var(--brass-hi);margin:14px 0 4px">Your family</h3>
+      <div style="overflow-x:auto"><table class="t"><tbody>${kin}</tbody></table></div>
+      ${st.notes.length ? `<h3 style="font:20px var(--display);color:var(--brass-hi);margin:14px 0 4px">So far</h3><ul class="facts">${st.notes.slice(0, 10).map(n => `<li><span class="note num">${dateStr(n.d)}</span> ${esc(n.t)}</li>`).join("")}</ul>` : ""}</div>
+    <footer><button class="b main" id="shBack" autofocus>Back</button></footer>`, e => { if (e.key === "Escape") back(); });
+  if (mode === "map") mode = "panel";
+  $("shBack").onclick = back;
+  panel.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { G.target = { ai: +b.dataset.go }; if (paused) togglePause(); closePanel(); resumeMap(); toast("Course laid in.", 2000); });
+}
+
+// ---------- hooks into the rest of the game ----------
+const _victoryS = victory;
+victory = function (result, line) { const a = B.a; if (a.agent && G.story) storyAgentBeaten(a, result, () => _victoryS(result, line)); else _victoryS(result, line); };
+const _openPortS = openPort;
+openPort = function (id, tab) { _openPortS(id, tab); storyPortCard(PORT[id]); };
+const _aiHostileS = aiHostile; aiHostile = a => a.agent ? true : _aiHostileS(a);
+const _aiLabelS = aiLabel; aiLabel = a => a.agent ? agentLabel(a) : _aiLabelS(a);
+const _applyRepS = applyRep;
+applyRep = function (a, won, attackedOnly) { if (!a.agent) return _applyRepS(a, won, attackedOnly); if (won && !attackedOnly) G.fame += a.hunter ? 6 : 12; G.rep.pirate = clamp(G.rep.pirate, -100, 100); };
+const _renderTavernS = renderTavern;
+renderTavern = function (p) {
+  _renderTavernS(p); if (!G.story) return;
+  const T = tavern, cost = 25, d = document.createElement("div"); d.className = "card"; d.style.marginTop = "14px";
+  d.innerHTML = T.storyAns ? `<h3>Asking after ${esc(vName())}</h3><div class="say" style="font-style:italic;color:var(--parch)">"${esc(T.storyAns)}"</div>`
+    : `<div class="row" style="justify-content:space-between;gap:10px"><div><h3>Asking after ${esc(vName())}</h3><div class="note">A round of drinks loosens tongues. Somebody here may know who does ${esc(SV().short)}'s work, and where.</div></div>
+      <button class="b sm main" id="tAsk"${G.gold >= cost ? "" : " disabled"}>Buy a round and ask · ${fmtGold(cost)}</button></div>`;
+  const h = [...$("portBody").querySelectorAll("h3")].find(x => x.textContent === "Overheard at the bar");
+  if (h) h.before(d); else $("portBody").appendChild(d);
+  if ($("tAsk")) $("tAsk").onclick = () => { if (G.gold < cost) return; G.gold -= cost; T.storyAns = storyAsk(p); save(); openPort(p.id, "tavern"); };
+};
+// The chart: known lieutenants and the villain fly a red pennant and are named.
+function drawAgentMarks(c, toS) {
+  if (!G.story) return;
+  for (const a of G.ais) { if (!a.agent) continue; const [x, y] = toS(a.x, a.y); if (x < -40 || y < -40 || x > MW + 40 || y > MH + 40) continue;
+    c.strokeStyle = "#e0613f"; c.lineWidth = 1.5; c.setLineDash([3, 4]); c.beginPath(); c.arc(x, y, 20, 0, TAU); c.stroke(); c.setLineDash([]);
+    c.font = `13px "Alegreya Sans", system-ui, sans-serif`; c.textAlign = "center"; const lab = a.hunter ? "Hunter" : a.name, w = c.measureText(lab).width;
+    c.fillStyle = "rgba(14,19,27,.78)"; c.fillRect(x - w / 2 - 4, y - 38, w + 8, 16); c.fillStyle = "#f0a58c"; c.fillText(lab, x, y - 26); }
+  const st = G.story, V = SV();
+  if (st.hold && !st.won) { const b = bodyPos(V.hold.body, G.day), r = bodySize(V.hold.body) + 8, [x, y] = toS(b.x + r * 0.7, b.y - r * 0.7);
+    c.fillStyle = "#e0613f"; c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 6, y); c.lineTo(x, y + 7); c.lineTo(x - 6, y); c.closePath(); c.fill();
+    if (cam.z > 0.5) { c.font = `12px "Alegreya Sans", system-ui, sans-serif`; c.textAlign = "left"; c.fillStyle = "#f0a58c"; c.fillText(V.hold.name, x + 10, y + 4); } }
+}
+
 // ===================== AETHERFORGE GAME =====================
 const $ = id => document.getElementById(id);
 const SAVE_KEY = "aetherforge-save-v1";
@@ -3849,6 +4167,11 @@ function moveAis(dd) {
     if (hostile && dMe < 130 * WORLD && (a.role === "pirate" ? s.guns >= shipDef().guns * 0.6 : s.guns >= shipDef().guns * 0.9)) a.chasing = true;
     if (a.chasing && (dMe > 210 * WORLD || G.docked || !hostile)) a.chasing = false;
     if (a.chasing) { tx = me.x; ty = me.y; }
+    else if (a.agent && !a.hunter) {   // the villain's people keep station around their own world
+      const hb = bodyPos(a.home, G.day);
+      if (!a.wo || Math.hypot(hb.x + a.wo.x - a.x, hb.y + a.wo.y - a.y) < 15) { const an = rnd(0, TAU), r = bodySize(a.home) + rnd(45, 110); a.wo = { x: Math.cos(an) * r, y: Math.sin(an) * r }; }
+      tx = hb.x + a.wo.x; ty = hb.y + a.wo.y;
+    }
     else if (a.role === "pirate") {
       if (!a.wp || Math.hypot(a.wp.x - a.x, a.wp.y - a.y) < 15) { const p = portPos(pickOne(PORTS)); a.wp = { x: p.x * rnd(0.85, 1.1) + rnd(-50, 50) * WORLD, y: p.y * rnd(0.85, 1.1) + rnd(-50, 50) * WORLD }; a.wander++; }
       tx = a.wp.x; ty = a.wp.y;
@@ -3893,7 +4216,7 @@ function dayTick() {
   if (s.morale <= 0) { defeat("Starving and furious, the crew mutinied and put you off at the nearest port.", { mutiny: true }); return; }
   if (s.morale < 20 && Math.random() < 0.15) toast("Grumbling below decks. Morale is dangerously low.");
   officersDaily();
-  outpostsDaily();
+  outpostsDaily(); storyDaily();
   driftPrices();
   for (const st of G.storms) { st.life--; }
   G.storms = G.storms.filter(st => st.life > 0);
@@ -4003,7 +4326,7 @@ function drawMap(t) {
     drawShip2(c, x, y, a.h, Math.max(0.42, z * 0.55) * SHIPS[a.type].size, a.type, a.corsair ? "pirate" : a.nat, a.role, t, true, null);
     if (a.chasing) { c.strokeStyle = "rgba(224,97,63,.8)"; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y, 16, 0, TAU); c.stroke(); }
   }
-  drawOutposts(c, toS, z);
+  drawOutposts(c, toS, z); drawAgentMarks(c, toS);
   drawNetShips(c, t, z);
   drawFleetOnChart(c, t, z);
   // wake + player
@@ -4232,7 +4555,7 @@ function introScreen(secret) {
       <p>${secret ? "You were only a child when your family was ruined. For years you didn't even know the name of the one responsible. Now you do. " + v.story : v.story}</p>
       <p>Ten years later you signed on a cramped ether packet under a brutal captain. Halfway across the aether the crew had had enough, and they chose you to lead them. The captain went over the side in a lifeboat, and the ship became yours.</p>
       <p>Now the <i>${esc(G.shipName)}</i> rides at anchor in ${home.name}. Thirty hands, a little coal, a few weeks' provisions, and a debt to settle with ${v.n}.</p>
-      <p class="note">The hunt for your family begins in a later version. For now, make your name: trade, take prizes, win honours.</p>
+      <p class="note">${v.n} does nothing in person. Start by buying a round in the public houses and asking who does the work. Your journal (Captain, then The hunt) keeps track of what you learn.</p>
     </div></div>
     <footer><button class="b main" id="iGo" autofocus>Go ashore</button></footer>`);
   $("iGo").onclick = () => { closePanel(); startVoyage(); };
@@ -4517,7 +4840,7 @@ function captainScreen(back) {
     <div class="body">
       <div class="grid2">
         <div class="card"><h3>The ${esc(G.shipName)}</h3><div class="note">${d.n} · ${d.guns} guns</div><div class="note">${Object.keys(UPG).map(k => `${UPG[k].n} ${pips(G.ship.up[k])}`).join(" · ")}</div><div class="note num">Hull ${Math.round(s.hull)}/${d.hull} · vanes ${Math.round(s.vanes)}/${d.vanes} · crew ${s.crew}/${d.crew} · morale ${Math.round(s.morale)}</div></div>
-        <div class="card"><h3>Your nemesis</h3><div class="note">${v.n}, ${v.d.toLowerCase()}.</div></div>
+        <div class="card"><h3>Your nemesis</h3><div class="note">${v.n}, ${v.d.toLowerCase()}.</div><div class="note">${G.story.won ? "Beaten." : `${G.story.lts.filter(l => l.done).length} of 3 lieutenants beaten`} · ${G.story.kin.filter(k => k.free).length} of 3 of your family freed</div></div>
         <div class="card"><h3>Ashore</h3><div class="note">${G.suits ? "Pressure suits aboard" : "No pressure suits"} · ${G.charter ? `colonial charter from ${NATIONS[G.charter].short}` : "no colonial charter"}</div>
           <div class="note">${outposts().length} outpost${outposts().length === 1 ? "" : "s"} · ${Object.values(G.sites).filter(x => x.surveyed).length} of ${SITES.length} sites surveyed${G.reports ? ` · ${G.reports} survey report${G.reports === 1 ? "" : "s"} to sell on Earth` : ""}</div>
           ${G.fragments ? `<div class="note">Star-chart tablets found: ${G.fragments}</div>` : ""}</div>
@@ -4529,11 +4852,12 @@ function captainScreen(back) {
       ${G.writ ? `<p class="note">You sail under the Prince's Writ of Thoth-Ka. The empires call you a renegade.</p>` : ""}
       <p class="note">${G.wars.length ? "At war: " + G.wars.map(w => `${NATIONS[w[0]].short} and ${NATIONS[w[1]].short}`).join("; ") + "." : "No wars at present."}</p>
     </div>
-    <footer><button class="b" id="cOff">Officers</button><button class="b" id="cTitle">Save and quit to title</button><button class="b" id="cAbout">About</button><button class="b main" id="cBack" autofocus>Back</button></footer>`,
+    <footer><button class="b" id="cHunt">The hunt</button><button class="b" id="cOff">Officers</button><button class="b" id="cTitle">Save and quit to title</button><button class="b" id="cAbout">About</button><button class="b main" id="cBack" autofocus>Back</button></footer>`,
     e => { if (e.key === "Escape") $("cBack").click(); });
   $("cBack").onclick = () => { if (back) back(); else { closePanel(); mode = prevMode === "panel" ? "map" : prevMode; resumeMap(); } };
   $("cTitle").onclick = () => { save(); titleScreen(); };
   $("cOff").onclick = () => officersScreen(() => captainScreen(back));
+  $("cHunt").onclick = () => storyScreen(() => captainScreen(back));
   $("cAbout").onclick = () => aboutScreen(() => captainScreen(back));
 }
 function logScreen(back) {
@@ -4550,11 +4874,11 @@ function openEncounter(id) {
   mode = "panel";
   const s = SHIPS[a.type], hostile = aiHostile(a);
   const lawful = a.nat !== "pirate" && G.marque.some(m => atWar(m, a.nat));
-  const warn = a.role === "pirate" ? "Pirates are fair game for anyone." : lawful ? `Your letter of marque makes her a lawful prize.` : `Attacking her will anger the ${NATIONS[a.nat].name}.`;
+  const warn = a.agent ? "No flag protects her, and nobody will mourn her." : a.role === "pirate" ? "Pirates are fair game for anyone." : lawful ? `Your letter of marque makes her a lawful prize.` : `Attacking her will anger the ${NATIONS[a.nat].name}.`;
   showPanel(`
     <header><div><h2 id="pTitle">The ${esc(a.name)}</h2><div class="tag">Through the telescope: a ${esc(aiLabel(a))}</div></div></header>
     <div class="body"><div class="prose">
-      <p>${a.role === "pirate" ? "She flies no honest flag." : `She flies the colours of the ${NATIONS[a.nat].name}.`} ${a.role === "merchant" ? `Bound for ${PORT[a.dest].name}, ${cargoHint(a)}.` : a.role === "navy" ? `A navy ship on patrol to ${PORT[a.dest].name}.` : `She's ${cargoHint(a)}.`}</p>
+      <p>${a.agent ? (a.hunter ? `She has been sent to find you by ${esc(SV().agents)}.` : a.story === 3 ? `${esc(a.capName)} is aboard. This is what you came for.` : `${esc(a.capName)} commands her, for ${esc(vName())}.`) : a.role === "pirate" ? "She flies no honest flag." : `She flies the colours of the ${NATIONS[a.nat].name}.`} ${a.role === "merchant" ? `Bound for ${PORT[a.dest].name}, ${cargoHint(a)}.` : a.role === "navy" ? `A navy ship on patrol to ${PORT[a.dest].name}.` : `She's ${cargoHint(a)}.`}</p>
       <p>About ${Math.round(a.crew / 10) * 10} hands and ${s.guns} guns. ${hostile ? "<b>She's running out her guns.</b>" : "She seems peaceable enough."}</p>
       <p class="note">${warn}</p></div></div>
     <footer><button class="b" id="eLeave"><span class="key">C</span>Sheer off</button><button class="b" id="eHail"><span class="key">X</span>Hail her</button><button class="b main" id="eAtk"><span class="key">Z</span>Attack</button></footer>`,
