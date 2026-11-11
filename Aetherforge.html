@@ -933,7 +933,7 @@ function drawPortrait(cv,b,frame){
 }
 
 // ===================== AETHERFORGE DATA =====================
-const VERSION = "0.32";
+const VERSION = "0.33";
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -2072,15 +2072,16 @@ const newFighter = () => ({ st: "idle", t: 0, dur: 0, kind: null, rip: 0, off: f
 function duelLook(a) {
   if (a === "player") { const coat = { gb: "#a8322a", de: "#3c4a5c", fr: "#2f4f8f", ru: "#2f6b4a" }[G.nation] || "#a8322a";
     return { coat, trim: "#e8c873", skin: "#e2b48c", pants: "#efe2c4", hat: "cap", hatCol: "#1d1a17", blade: G.sword || "sabre", hair: "#5a3a22", epaulette: G.rank >= 2 }; }
-  if (a.corsair) return { coat: "#3a2420", trim: "#c9a14a", skin: "#9a3a2c", pants: "#2a1d12", hat: "crest", hatCol: "#1a120b", blade: "scimitar", hair: "#1a0c08", sash: "#c9a14a", glove: "#5a1a14" };
-  if (a.nat === "mars") return { coat: "#6a4a8a", trim: "#e0b45a", skin: "#c9a06c", pants: "#d9a85a", hat: "tall", hatCol: "#e0b45a", blade: "rapier", hair: "#2a1a10", sash: "#8a2a4a", boot: "#3a2418" };
+  if (a.corsair) return { species: "Skarr", coat: "#3a2420", trim: "#c9a14a", skin: "#5e4232", pants: "#2a1d12", hat: "none", hatCol: "#1a120b", blade: "scimitar", hair: "#1a0c08", sash: "#c9a14a", glove: "#3e2a20" };
+  if (a.nat === "mars") return { species: "Ossari", coat: "#6a4a8a", trim: "#e0b45a", skin: "#d9a95a", pants: "#d9a85a", hat: "fez", hatCol: "#8a2a4a", blade: "rapier", hair: "#2a1a10", sash: "#8a2a4a", boot: "#3a2418", glove: "#d9a95a" };
   if (a.role === "pirate") return { coat: "#2c2622", trim: "#9a3a2a", skin: "#d9a57c", pants: "#5a4a3a", hat: "tricorn", hatCol: "#1d1814", blade: "cutlass", beard: "full", hair: "#1a120b", sash: "#7a2a22", boot: "#2a1a10" };
   if (a.role === "navy") return { coat: "#1f2c44", trim: "#e8c873", skin: "#e2b48c", pants: "#e3e3df", hat: "cap", hatCol: "#101827", blade: "sabre", beard: "chops", hair: "#6a4a30", epaulette: true };
   return { coat: "#6b4a2b", trim: "#c9c3b4", skin: "#e2b48c", pants: "#3b3f44", hat: "topper", hatCol: "#222", blade: "rapier", beard: "moustache", hair: "#4a3424", buttons: "#c9a14a" };
 }
 // Background brawlers: the same figures, in the dim colours of their side.
 function crewLook(L, side) { const k = side ? -0.45 : -0.5;
-  return { coat: shade(L.coat, k), trim: shade(L.trim, -0.55), skin: shade(side && L.skin === "#9a3a2c" ? L.skin : "#c89a74", -0.55), pants: shade(L.pants, -0.6), hat: side && L.hat === "tricorn" ? "tricorn" : side && L.hat === "crest" ? "crest" : "none",
+  const sp = side ? L.species : null;
+  return { species: sp, coat: shade(L.coat, k), trim: shade(L.trim, -0.55), skin: shade(sp ? L.skin : "#c89a74", -0.55), glove: sp ? shade(L.skin, -0.55) : null, pants: shade(L.pants, -0.6), hat: side && (L.hat === "tricorn" || L.hat === "fez") ? L.hat : "none",
     hatCol: shade(L.hatCol, -0.3), blade: side ? (L.blade === "rapier" ? "sabre" : L.blade) : "cutlass", hair: "#140d08", boot: "#120c08", shirt: "#6a6458", belt: "#140d08", buttons: shade(L.trim, -0.55) }; }
 const BRAWL = [["wind", "chop", 0.62], ["strike", "chop", 0.14], ["rec", "chop", 0.5], ["idle", null, 0.5], ["wind", "slash", 0.48], ["strike", "slash", 0.14], ["rec", "slash", 0.4], ["def", "parry", 0.45], ["idle", null, 0.6], ["def", "duck", 0.45]];
 function brawlPose(b, t) { // loop through a little fight of its own
@@ -2191,15 +2192,15 @@ function duelPose(F, t) {
     else { P.arm = mix(0.25, -1.9, e); P.sword = mix(0.8, -2.5, e); P.crouch = 0.25 * e; } }
   else if (F.st === "strike") { const e = ease(k);
     if (F.kind === "chop") { P.arm = mix(2.25, -0.35, e); P.sword = mix(2.5, -0.3, e); P.lean = 0.4 * e; P.lunge = 0.5 * e; }
-    else if (F.kind === "thrust") { P.arm = 0.05; P.reach = mix(0.4, 1.2, e); P.sword = 0.02; P.lean = 0.5 * e; P.lunge = e; }
+    else if (F.kind === "thrust") { P.arm = 0.05; P.reach = mix(0.4, 1.2, e); P.sword = 0.02; P.lean = 0.5 * e; P.lunge = e; P.straight = e > 0.5; }
     else { P.arm = mix(-1.9, -0.5, e); P.sword = mix(-2.5, -0.35, e); P.crouch = 0.3; P.lean = 0.35 * e; P.lunge = 0.6 * e; } }
   else if (F.st === "rec") { const e = 1 - ease(k), kd = F.kind;
-    if (kd === "chop") { P.arm = mix(0.25, -0.35, e); P.sword = mix(0.8, -0.3, e); } else if (kd === "thrust") { P.arm = 0.05 + 0.2 * (1 - e); P.reach = mix(1, 1.2, e); P.sword = mix(0.8, 0.02, e); } else if (kd === "slash") { P.arm = mix(0.25, -0.5, e); P.sword = mix(0.8, -0.35, e); P.crouch = 0.3 * e; }
+    if (kd === "chop") { P.arm = mix(0.25, -0.35, e); P.sword = mix(0.8, -0.3, e); } else if (kd === "thrust") { P.arm = 0.05 + 0.2 * (1 - e); P.reach = mix(1, 1.2, e); P.sword = mix(0.8, 0.02, e); P.straight = e > 0.5; } else if (kd === "slash") { P.arm = mix(0.25, -0.5, e); P.sword = mix(0.8, -0.35, e); P.crouch = 0.3 * e; }
     P.lean = (F.off ? 0.55 : 0.3) * e; P.lunge = (ATK[kd] ? 0.6 : 0) * e; }
   else if (F.st === "def") { const e = Math.sin(k * Math.PI);
     if (F.kind === "jump") { P.lift = 34 * e; P.tuck = e; P.arm = 0.7; P.sword = 1.2; }
     else if (F.kind === "duck") { P.crouch = Math.min(1, e * 1.6); P.arm = 1.0; P.sword = 1.9; }
-    else { P.arm = 0.55; P.sword = 1.52; P.lean = -0.3 * Math.min(1, e * 1.6); P.reach = 0.8; } }
+    else { P.arm = 0.42; P.sword = 1.5; P.lean = -0.3 * Math.min(1, e * 1.6); P.straight = true; } }
   else if (F.st === "stun") { const e = 1 - ease(k); P.lean = -0.8 * e; P.arm = mix(0.25, 1.7, e); P.sword = mix(0.8, 2.3, e); }
   else if (F.st === "taunt") { const e = Math.sin(k * Math.PI); P.arm = mix(0.25, 1.5, Math.min(1, e * 1.5)); P.sword = 1.57; P.hip = 1; P.lean = -0.1; }
   else if (F.st === "fall") { P.fall = Math.min(1, F.t / 0.9); P.arm = 1.9; P.sword = 2.4; P.lean = -1; }
@@ -2318,8 +2319,90 @@ function drawBlade(c, hx, hy, ang, kind, s) {
   return { x: tx, y: ty };
 }
 
+// Hats are drawn in two parts: the part that covers the skull is painted inside the skull's own
+// outline (so it always fits the head exactly), then the crown, brim or visor is added around it.
+const SKULL = () => { const p = new Path2D(); p.ellipse(0.2, -0.3, 5.75, 6.75, 0, 0, TAU); p.ellipse(-2.4, -1.6, 5.7, 6.5, -0.2, 0, TAU); return p; };
+function drawHat(c, L, ossari) {
+  if (!L.hat || L.hat === "none") return;
+  const H = L.hatCol, Hd = shade(H, -0.35), Hl = shade(H, 0.28), edge = shade(H, 0.32);
+  c.lineJoin = "round"; c.strokeStyle = edge; c.lineWidth = 0.5;
+  const hb = (pts, col, st) => { blob(c, pts, col); if (st !== false) c.stroke(); };
+  // the part on the skull: everything above a brim line that runs from behind the ear to the brow
+  const cover = (yb, yf, col) => { if (ossari) return; c.save(); c.clip(SKULL()); c.fillStyle = col; c.beginPath(); c.moveTo(-10, yb); c.lineTo(8, yf); c.lineTo(8, -20); c.lineTo(-10, -20); c.closePath(); c.fill(); c.restore(); };
+  if (L.hat === "cap") {          // a kepi: snug band, crown tipped forward, short peak
+    cover(-1.2, -3.2, H);
+    hb([-7.4, -1.6, -6.6, -9.4, 3.0, -10.4, 4.9, -3.4], H);
+    c.fillStyle = Hl; c.fillRect(-5.8, -9.0, 7.4, 0.7);
+    blob(c, [-7.6, -1.4, 5.0, -3.4, 5.0, -2.1, -7.6, -0.1], L.trim);
+    hb([4.2, -3.6, 9.2, -2.3, 8.8, -1.4, 4.2, -2.3], Hd);
+  } else if (L.hat === "bowler") {
+    cover(-1.6, -3.4, H);
+    c.fillStyle = H; c.beginPath(); c.ellipse(-0.9, -4.0, 6.7, 6.4, 0, Math.PI, 0); c.fill(); c.stroke();
+    c.fillStyle = Hl; c.fillRect(-3.8, -9.4, 3.6, 0.7);
+    blob(c, [-7.8, -1.2, 5.4, -3.6, 5.4, -2.6, -7.8, -0.2], shade(H, 0.12));
+    hb([-9.4, -0.6, -7.2, -1.6, 5.8, -3.8, 7.6, -3.6, 7.4, -2.6, -9.0, 0.3], Hd);
+  } else if (L.hat === "topper") {
+    cover(-1.6, -3.4, H);
+    hb([-6.6, -1.8, -6.2, -16.4, 4.4, -16.8, 5.2, -3.6], H);
+    blob(c, [-6.6, -3.6, 5.2, -5.2, 5.2, -3.6, -6.6, -1.8], L.trim);
+    c.fillStyle = Hl; c.fillRect(-4.8, -15.6, 1.1, 11);
+    hb([-9.6, -0.8, -6.8, -1.6, 5.4, -3.8, 8.2, -3.6, 8.0, -2.5, -9.2, 0.3], Hd);
+  } else if (L.hat === "tricorn") {
+    cover(-0.6, -3.4, H);
+    hb([-11.4, 0.4, -7.6, -8.6, -1.2, -11.6, 5.4, -10.0, 10.2, -3.0, 4.8, -4.4, -1.0, -3.4, -6.4, -1.6], H);
+    hb([-7.0, -4.2, -4.6, -8.8, -0.6, -10.4, 4.0, -9.0, 6.4, -5.6, 1.0, -5.6], Hl, false);
+    c.strokeStyle = L.trim; c.lineWidth = 0.8; c.beginPath(); c.moveTo(-11.0, 0.2); c.lineTo(-6.4, -1.6); c.lineTo(-1.0, -3.4); c.lineTo(4.8, -4.4); c.lineTo(10.0, -3.0); c.stroke();
+  } else if (L.hat === "fez") {   // an Ossari noble's jewelled cap
+    cover(-2.6, -4.4, H);
+    hb([-5.2, -3.4, -4.0, -9.2, 3.4, -9.6, 4.6, -4.4], H);
+    c.fillStyle = Hl; c.fillRect(-3.0, -8.8, 1.0, 4.6);
+    blob(c, [-5.4, -4.4, 4.8, -5.4, 4.8, -4.0, -5.4, -3.0], L.trim);
+    c.fillStyle = "#8a2a4a"; c.beginPath(); c.arc(0, -4.4, 1.1, 0, TAU); c.fill();
+    c.fillStyle = L.trim; c.beginPath(); c.arc(-0.4, -10.6, 1.3, 0, TAU); c.fill();
+  } else if (L.hat === "crest") {
+    c.fillStyle = H; for (let i = -2; i <= 2; i++) blob(c, [i * 2.2 - 1.4, -4.2, i * 3.4 - 4.6, -14 + Math.abs(i) * 2.2, i * 2.2 + 1.4, -4.2], i % 2 ? Hd : H);
+  }
+}
+
+// An Ossari head: a smooth golden dome on a long ringed neck, three eyes, a small mouth.
+function drawOssariHead(c, L, P) {
+  const sk = L.skin, dk = shade(sk, -0.3), lt = shade(sk, 0.18);
+  c.fillStyle = dk; c.beginPath(); c.ellipse(0.6, -0.6, 7.0, 6.0, 0.08, 0, TAU); c.fill();
+  c.fillStyle = sk; c.beginPath(); c.ellipse(1.0, -1.0, 6.4, 5.4, 0.08, 0, TAU); c.fill();
+  c.fillStyle = lt; c.beginPath(); c.ellipse(-0.6, -3.2, 3.4, 1.8, -0.2, 0, TAU); c.fill();
+  // three eyes: two along the side, one low at the front
+  for (const [ex, ey, r] of [[2.6, -1.8, 1.25], [4.9, -1.2, 1.15], [4.4, 1.6, 0.95]]) {
+    c.fillStyle = "#2a1a10"; c.beginPath(); c.arc(ex, ey, r * (P.fall ? 0.4 : 1), 0, TAU); c.fill();
+    if (!P.fall) { c.fillStyle = "rgba(255,240,200,.85)"; c.beginPath(); c.arc(ex - r * 0.3, ey - r * 0.35, r * 0.32, 0, TAU); c.fill(); } }
+  c.strokeStyle = shade(sk, -0.5); c.lineWidth = 0.7; c.beginPath(); c.moveTo(5.2, 3.4); c.quadraticCurveTo(6.4, 3.6, 7.0, 2.8); c.stroke();
+}
+// A Skarr head: long reptile snout, a glowing eye, a crest of spines down the back of the skull.
+function drawSkarrHead(c, L, P) {
+  const sk = L.skin, dk = shade(sk, -0.35), lt = shade(sk, 0.2);
+  // spines
+  c.fillStyle = shade(sk, -0.5);
+  for (let i = 0; i < 5; i++) { const bx = -3.6 - i * 1.2, by = -5.2 + i * 2.0; blob(c, [bx + 1.6, by - 0.4, bx - 3.8 - i * 0.3, by - 4.4 + i * 1.3, bx - 0.4, by + 1.4]); }
+  // horn sweeping back
+  blob(c, [-1.2, -5.0, -6.0, -10.6, -7.4, -10.0, -3.0, -4.4], "#d8c8a0");
+  // skull and snout
+  c.fillStyle = dk; c.beginPath(); c.moveTo(-5.4, 0.4); c.lineTo(-4.6, -5.0); c.quadraticCurveTo(0, -7.4, 3.6, -5.2); c.lineTo(11.2, -2.4); c.quadraticCurveTo(12.6, -1.0, 11.2, 0.4); c.lineTo(4.4, 3.8); c.lineTo(-2.6, 4.6); c.closePath(); c.fill();
+  c.fillStyle = sk; c.beginPath(); c.moveTo(-4.4, -0.2); c.lineTo(-3.8, -4.6); c.quadraticCurveTo(0, -6.6, 3.4, -4.6); c.lineTo(10.8, -2.0); c.quadraticCurveTo(11.4, -1.0, 10.6, -0.4); c.lineTo(4.0, 0.6); c.lineTo(-2.0, 2.0); c.closePath(); c.fill();
+  c.fillStyle = lt; c.beginPath(); c.moveTo(0, -5.6); c.quadraticCurveTo(4, -5.2, 9.6, -2.6); c.lineTo(4, -4.0); c.closePath(); c.fill();
+  // jaw line and teeth
+  c.strokeStyle = "#1a0c08"; c.lineWidth = 0.7; c.beginPath(); c.moveTo(3.0, 1.2); c.lineTo(11.0, 0.0); c.stroke();
+  c.fillStyle = "#efe6cf"; for (let k = 0; k < 4; k++) { const tx = 5 + k * 1.6, ty = 1.0 - k * 0.24; blob(c, [tx, ty - 0.1, tx + 0.5, ty + 1.1, tx + 1.0, ty - 0.2]); }
+  // nostril and eye
+  c.fillStyle = "#1a0c08"; c.beginPath(); c.arc(10.4, -1.8, 0.45, 0, TAU); c.fill();
+  if (!P.fall) { const g = c.createRadialGradient(2.6, -3.0, 0, 2.6, -3.0, 3.2); g.addColorStop(0, "rgba(255,200,80,.55)"); g.addColorStop(1, "rgba(255,200,80,0)"); c.fillStyle = g; c.beginPath(); c.arc(2.6, -3.0, 3.2, 0, TAU); c.fill(); }
+  c.fillStyle = P.fall ? "#3a2418" : "#ffc04a"; c.beginPath(); c.ellipse(2.6, -3.0, 1.3, P.fall ? 0.25 : 0.8, -0.2, 0, TAU); c.fill();
+  if (!P.fall) { c.fillStyle = "#1a0c08"; c.fillRect(2.4, -3.7, 0.5, 1.4); }
+  c.strokeStyle = "#1a0c08"; c.lineWidth = 0.7; c.beginPath(); c.moveTo(0.8, -4.4); c.lineTo(4.2, -3.9 + (P.effort ? 0.5 : 0)); c.stroke();
+}
+
 function drawHead(c, hx, hy, tilt, L, P) {
   c.save(); c.translate(hx, hy); c.rotate(tilt);
+  if (L.species === "Ossari") { drawOssariHead(c, L, P); c.translate(0.9, -2.0); c.rotate(0.08); drawHat(c, L, true); c.restore(); return; }
+  if (L.species === "Skarr") { drawSkarrHead(c, L, P); c.restore(); return; }
   const sk = L.skin, dk = shade(sk, -0.3);
   // hair at the back
   c.fillStyle = L.hair; c.beginPath(); c.ellipse(-2.4, -1.6, 5.6, 6.4, -0.2, 0, TAU); c.fill();
@@ -2342,16 +2425,7 @@ function drawHead(c, hx, hy, tilt, L, P) {
   if (L.beard === "full") { blob(c, [-1.6, 1.6, 0.6, 2.4, 3.4, 3.4, 5.6, 4.6, 5.0, 7.0, 2.6, 8.4, -0.4, 7.4, -1.8, 4.4], L.hair); c.fillStyle = shade(sk, -0.45); c.fillRect(4.2, 4.2, 1.5, 0.6); }
   else if (L.beard === "chops") { blob(c, [-1.4, 0.6, 0.6, 1.0, 1.6, 5.2, 0.2, 6.6, -1.2, 4.0], L.hair); blob(c, [4.4, 3.0, 6.4, 3.2, 6.0, 3.9, 4.4, 3.8], L.hair); }
   else if (L.beard === "moustache") blob(c, [4.0, 3.0, 6.6, 3.1, 7.0, 4.2, 5.6, 3.7, 4.2, 3.9], L.hair);
-  // hats
-  const H = L.hatCol, Hd = shade(H, -0.35), Hl = shade(H, 0.28);
-  c.lineJoin = "round"; c.strokeStyle = shade(H, 0.32); c.lineWidth = 0.55;
-  const hb = (pts, col) => { blob(c, pts, col); c.stroke(); };
-  if (L.hat === "cap") { hb([-5.8, -3.0, -5.4, -8.2, 3.8, -8.8, 5.4, -4.2], H); hb([3.0, -4.4, 9.0, -3.6, 8.6, -2.8, 3.0, -3.1], Hd); c.fillStyle = L.trim; c.fillRect(-5.4, -4.6, 9.6, 1.1); c.fillStyle = Hl; c.fillRect(-4.6, -7.6, 7, 0.8); }
-  else if (L.hat === "tricorn") { hb([-10.5, -3.0, -6.0, -10.4, 1.0, -12.4, 7.0, -10.0, 11.4, -4.2, 5.0, -6.2, -3.0, -6.0], H); hb([-6.5, -6.6, -3.5, -10.4, 1.0, -11.2, 5.5, -9.4, 7.5, -6.8, 1, -7.4], Hl); c.strokeStyle = L.trim; c.lineWidth = 0.7; c.beginPath(); c.moveTo(-9.5, -3.6); c.quadraticCurveTo(0, -7.4, 10.4, -4.8); c.stroke(); }
-  else if (L.hat === "bowler") { c.fillStyle = H; c.beginPath(); c.ellipse(0, -5.2, 5.6, 5.0, 0, Math.PI, 0); c.fill(); c.stroke(); blob(c, [-7.4, -4.6, 7.4, -4.6, 7.0, -3.6, -7.0, -3.6], Hd); c.fillStyle = Hl; c.fillRect(-3.6, -9.2, 4, 0.7); }
-  else if (L.hat === "tall") { hb([-4.6, -4.2, -3.6, -17.0, 4.2, -17.4, 4.8, -4.2], H); c.fillStyle = "#6a4a8a"; c.fillRect(-4.4, -8.2, 9.2, 1.6); c.fillStyle = Hl; c.fillRect(-2.8, -16.4, 1.1, 11); }
-  else if (L.hat === "crest") { c.fillStyle = H; for (let i = -2; i <= 2; i++) blob(c, [i * 2.2 - 1.2, -5.0, i * 3.4 - 4.6, -15 + Math.abs(i) * 2.2, i * 2.2 + 1.2, -5.0], i % 2 ? Hd : H); }
-  else if (L.hat === "topper") { hb([-4.8, -4.2, -4.4, -15.0, 4.6, -15.0, 5.0, -4.2], H); hb([-7.6, -4.8, 7.8, -4.8, 7.6, -3.6, -7.4, -3.6], Hd); c.fillStyle = L.trim; c.fillRect(-4.7, -6.6, 9.6, 1.4); }
+  drawHat(c, L);
   c.restore();
 }
 
@@ -2377,9 +2451,10 @@ function drawFencer2(c, x, gy, s, f, F, L, t, dim) {
   const toW = (px, py) => ({ x: hip.x + px * Math.cos(lw) - py * Math.sin(lw), y: hip.y + px * Math.sin(lw) + py * Math.cos(lw) });
   const shF = toW(-0.5, -26.5), shB = toW(-3.5, -26);
   // the sword hand, from the pose's arm angle and reach
-  const reach = (FIG.upper + FIG.fore) * clamp(0.62 + 0.36 * P.reach, 0.35, 0.99);
+  // a parry or a thrust is made with a straight arm; elsewhere the elbow bends naturally, downward
+  const reach = (FIG.upper + FIG.fore) * (P.straight ? 1.0 : clamp(0.62 + 0.36 * P.reach, 0.35, 0.97));
   const hand = { x: shF.x + Math.cos(P.arm) * reach, y: shF.y - Math.sin(P.arm) * reach };
-  const sa = ik2(shF.x, shF.y, hand.x, hand.y, FIG.upper, FIG.fore, 1);
+  const sa = ik2(shF.x, shF.y, hand.x, hand.y, FIG.upper, FIG.fore, -1);
   // off hand: raised behind for balance, on the hip when taunting, flung out when stunned or falling
   let oh;
   if (P.hip) oh = { x: hip.x - 4, y: hip.y - 4 };
@@ -2434,7 +2509,14 @@ function drawFencer2(c, x, gy, s, f, F, L, t, dim) {
   c.restore();
   // ---- head ----
   const tilt = lw * 0.5 + (F.st === "stun" ? -0.35 : 0) + (P.crouch > 0.5 ? 0.2 : 0);
-  const hd = toW(0.6, -40);
+  let hd = toW(0.6, -40);
+  if (L.species === "Ossari") { // a long ringed neck rising from the collar
+    const n0 = toW(-0.6, -32), n1 = toW(1.2, -45);
+    limb(c, n0.x, n0.y, n1.x, n1.y, 2.6, 2.2, L.skin, true);
+    c.strokeStyle = shade(L.skin, -0.4); c.lineWidth = 0.6;
+    for (let k = 1; k < 5; k++) { const p = { x: mix(n0.x, n1.x, k / 5), y: mix(n0.y, n1.y, k / 5) }; c.beginPath(); c.moveTo(p.x - 2.4, p.y + 0.3); c.lineTo(p.x + 2.4, p.y - 0.3); c.stroke(); }
+    hd = toW(2.2, -50); }
+  else if (L.species === "Skarr") hd = toW(0.0, -40.5);
   c.save(); c.translate(hd.x, hd.y); c.scale(1.3, 1.3); drawHead(c, 0, 0, tilt, L, P); c.restore();
   // ---- sword arm and blade ----
   limb(c, shF.x, shF.y, sa.jx, sa.jy, 4.4, 3.6, coat, true);
@@ -2657,6 +2739,10 @@ function confirmCloud(back) {
 // ===================== TITLE, PAUSE MENU, MANUAL, CHANGELOG, ABOUT (0.26) =====================
 // Spoiler-free changelog, newest first.
 const CHANGELOG = [
+  { v: "0.33", items: [
+    "Martian nobles in boarding duels are now Ossari, and corsair captains are Skarr, drawn from their portraits. Their crews match.",
+    "Duellists parry and thrust with a straight arm, and elbows bend the natural way.",
+    "Hats fit their wearers' heads." ] },
   { v: "0.32", items: [
     "Landings. Sail to a world and choose Land (or tap the world on the chart). Each world has sites to survey, and the learned societies on Earth pay for your reports.",
     "Dig ore, quicksilver, coal, amber and apergy yourself, and collect natural specimens for the museums. Airless worlds need pressure suits, sold at the great Earth yards and at Ceres.",
